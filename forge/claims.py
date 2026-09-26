@@ -268,6 +268,7 @@ def build_claims(
     seed: int = 42,
     now: datetime | None = None,
     holdout_share: float = 0.20,
+    id_prefix: str = "clm_",
 ) -> list[dict]:
     now = now or datetime.now(timezone.utc)
     rng = random.Random(seed)
@@ -292,7 +293,7 @@ def build_claims(
         dx, lines = services_for(enc, patient, r, age, first_wellness)
         records, auth, ref = _paperwork({ln["hcpcs"] for ln in lines}, enc.encounter_class, r)
         claims.append({
-            "_id": f"clm_{i + 1:05d}",
+            "_id": f"{id_prefix}{i + 1:05d}",
             "insurer": insurer,
             "patient": {
                 "name": patient.name,

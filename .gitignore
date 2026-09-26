@@ -39,3 +39,6 @@ Thumbs.db
 # Local run artifacts
 *.log
 demo_snapshot*.json
+
+# Demo snapshots (README: data/snapshots stays ignored)
+data/snapshots/

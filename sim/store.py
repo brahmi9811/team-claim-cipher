@@ -95,8 +95,6 @@ class MongoLedger:
 
             db = get_db("simulator")
         self._db = db
-        self._versions: dict[str, int] = {}
-        self._lock = threading.RLock()
 
     @property
     def _truth(self):
@@ -126,11 +124,9 @@ class MongoLedger:
         self._truth.update_one({"_id": adjudication_id}, {"$push": {"appeals": appeal}})
 
     def policy_version(self, insurer: str) -> int:
-        with self._lock:
-            if insurer not in self._versions:
-                doc = self._db[POLICIES].find_one({"insurer": insurer, "current": True}, sort=[("version", -1)])
-                self._versions[insurer] = int(doc["version"]) if doc else 1
-            return self._versions[insurer]
+        """Read from `policies` every time, so a republish by another process (forge load, reset) is seen at once."""
+        doc = self._db[POLICIES].find_one({"insurer": insurer, "current": True}, {"version": 1}, sort=[("version", -1)])
+        return int(doc["version"]) if doc else 1
 
     def set_policy_version(self, insurer: str, version: int) -> None:
         """Publish `version` in `policies`: its clauses become current, every other version is marked not current."""
@@ -138,5 +134,3 @@ class MongoLedger:
         for doc in pol.policy_docs(insurer, version, current=True):
             coll.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)  # $set keeps a stored `embedding`
         coll.update_many({"insurer": insurer, "version": {"$ne": version}}, {"$set": {"current": False}})
-        with self._lock:
-            self._versions[insurer] = version

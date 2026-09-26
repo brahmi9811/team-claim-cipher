@@ -182,8 +182,8 @@ def _llm_outputs(db) -> list[dict]:
     for rule in db["rules"].find({}, {"insurer": 1, "condition": 1, "fix": 1}):
         outputs.append({"insurer": rule.get("insurer"), "text": json.dumps([rule.get("condition"), rule.get("fix")], default=str)})
     for appeal in db["appeals"].find({}, {"insurer": 1, "letter_tokenized": 1}):
-        # render_letter puts the patient's name back after the LLM is done, so names don't count here
-        outputs.append({"insurer": appeal.get("insurer"), "text": appeal.get("letter_tokenized") or "", "names_allowed": True})
+        # letter_tokenized is stored before render_letter adds the name back, so a name here is a leak
+        outputs.append({"insurer": appeal.get("insurer"), "text": appeal.get("letter_tokenized") or ""})
     return outputs
 
 

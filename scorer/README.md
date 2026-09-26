@@ -23,8 +23,10 @@ python -m pytest scorer/tests
 | `holdout_sample`, `judged_denials`, `appeals_decided` | sample sizes, so a reader knows how much to trust the numbers |
 
 Verdicts are joined to the ground truth by `adjudications._id` (the simulator's `adjudication_id`),
-falling back to the claim's latest denial. Appeal letters are checked for PHI except patient
-names, because `render_letter` adds the real name back after the LLM is done.
+falling back to the claim's latest denial. Appeal letters are checked as stored (`letter_tokenized`,
+before `render_letter` adds the real name back), so a patient name in one counts as a leak.
+LLM prompts aren't stored, so requests are covered by the firewall blocking them (`leaks_blocked`),
+not by `phi_leaks_to_llm`.
 
 MongoDB role: `scorer` (`MONGODB_URI_SCORER`, falls back to `MONGODB_URI`).
 `compute_metrics()` in `score.py` is pure (lists in, documents out) if you want to check a number by hand.

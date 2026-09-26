@@ -255,7 +255,7 @@ claim-cipher/
 3. `python scripts/setup_db.py` creates collections and indexes (run once, by B).
 4. Start the simulator, the orchestrator and the live view (exact commands added by each owner).
 
-**Claims and policies (A):** `python -m forge all` downloads the Synthea sample, builds 2,000 claims and loads claims (encrypted), policies and hashed PHI canaries. `python -m sim.report` shows the denial mix. Details: [forge/README.md](forge/README.md).
+**Claims and policies (A):** `python -m forge all` downloads the Synthea sample, builds 2,000 claims and loads claims (encrypted), policies and hashed PHI canaries. For the long run, add more first with `python -m forge extend --rounds 4` then `python -m forge load` (2,000 claims last only about 17 minutes at 2 per second). `python -m sim.report` shows the denial mix. Details: [forge/README.md](forge/README.md).
 
 **Simulator (A):** `python -m sim` serves http://localhost:8001 (`--memory` without MongoDB, `--stub` for random responses). Payer C policy change: `POST /admin/policy-change/payer_c`; reset: `POST /admin/policy-reset/payer_c`. Contract: [sim/README.md](sim/README.md).
 

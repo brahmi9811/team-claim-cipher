@@ -15,6 +15,7 @@ rule (docs/PLAN.md, "Appeal logic"):
 from __future__ import annotations
 
 import re
+import threading
 from datetime import datetime, timezone
 from typing import Callable
 
@@ -60,10 +61,17 @@ class Simulator:
     def __init__(self, ledger: Ledger | None = None, clock: Callable[[], datetime] = _utcnow) -> None:
         self.ledger = ledger or MemoryLedger()
         self.clock = clock
+        # FastAPI runs these handlers in a thread pool; attempt numbers and appeal
+        # payouts are read-then-write, so concurrent calls for one claim must not interleave.
+        self._lock = threading.RLock()
 
     # --- POST /submit -------------------------------------------------------
 
     def submit(self, claim: dict) -> dict:
+        with self._lock:
+            return self._submit(claim)
+
+    def _submit(self, claim: dict) -> dict:
         cid, insurer = self._validate_claim(claim)
         history = self.ledger.history(cid)
         attempt = len(history) + 1
@@ -156,6 +164,10 @@ class Simulator:
     # --- POST /appeal -------------------------------------------------------
 
     def appeal(self, request: dict) -> dict:
+        with self._lock:
+            return self._appeal(request)
+
+    def _appeal(self, request: dict) -> dict:
         cid = request.get("claim_id")
         if not cid:
             raise BadRequest("appeal needs a claim_id")
@@ -204,14 +216,16 @@ class Simulator:
 
     def policy_change(self, insurer: str) -> dict:
         self._known(insurer)
-        current = self.ledger.policy_version(insurer)
-        if current >= LATEST_VERSION[insurer]:
-            raise Conflict(f"{insurer} is already at its latest policy version (v{current})")
-        return self._publish(insurer, current + 1, current)
+        with self._lock:
+            current = self.ledger.policy_version(insurer)
+            if current >= LATEST_VERSION[insurer]:
+                raise Conflict(f"{insurer} is already at its latest policy version (v{current})")
+            return self._publish(insurer, current + 1, current)
 
     def policy_reset(self, insurer: str) -> dict:
         self._known(insurer)
-        return self._publish(insurer, 1, self.ledger.policy_version(insurer))
+        with self._lock:
+            return self._publish(insurer, 1, self.ledger.policy_version(insurer))
 
     def _publish(self, insurer: str, version: int, previous: int) -> dict:
         self.ledger.set_policy_version(insurer, version)

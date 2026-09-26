@@ -52,6 +52,7 @@ CASES = [
     ("payer_a", 1, "a_legit_07", claim("payer_a", line("J1885", units=6))),
     ("payer_a", 1, "a_legit_08", claim("payer_a", line("G0283", units=6))),
     ("payer_a", 1, "a_wrong_01", claim("payer_a", line("G0463"), dx=("I10",))),
+    ("payer_b", 1, "b_legit_06", claim("payer_b", line("G0463"), days_ago=130)),
     ("payer_b", 1, "b_legit_01", claim("payer_b", line("C8901"))),
     ("payer_b", 1, "b_legit_02", claim("payer_b", line("G0463"), ref=None)),
     ("payer_b", 1, "b_legit_03", claim("payer_b", line("A0429"), dx=("R07.9",))),
@@ -60,6 +61,7 @@ CASES = [
     ("payer_b", 1, "b_wrong_01", claim("payer_b", line("C8908"), pa="PA-ZX9K2M", dx=("R10.9",))),
     ("payer_b", 1, "b_wrong_02", claim("payer_b", line("G0463"), dx=("Z09",))),
     ("payer_b", 1, "b_wrong_03", claim("payer_b", line("G0463"), pa="PA-ZX9K2M")),
+    ("payer_c", 1, "c_legit_10", claim("payer_c", line("G0463"), days_ago=130)),
     ("payer_c", 1, "c_legit_01", claim("payer_c", line("J9355", units=4), dx=("C50.911",))),
     ("payer_c", 1, "c_legit_02", claim("payer_c", line("C8901"), ref=None)),
     ("payer_c", 1, "c_legit_03", claim("payer_c", line("J1885", units=6))),
@@ -101,7 +103,7 @@ def test_rule_fires(insurer, version, rule_id, base):
 def test_legit_rules_are_learnable(insurer, version, rule_id, base):
     rule = next(r for r in rules_for(insurer, version) if r.id == rule_id)
     if not rule.fix:
-        assert rule_id == "a_legit_01"  # timely filing can't be fixed after the fact
+        assert rule.carc == "CO-29"  # timely filing can't be fixed after the fact
         return
     fixed = apply_fix(rule.fix, with_id_that_fires(insurer, version, rule_id, base))
     after = first_match(fixed, rules_for(insurer, version))
@@ -142,6 +144,25 @@ def test_fix_and_resubmit_then_duplicate():
     assert (second["status"], second["attempt"], second["adjudication_id"]) == ("paid", 2, "adj_clm_resub_2")
     third = sim.submit(fixed)
     assert (third["status"], third["carc"]) == ("denied", "CO-18")
+
+
+def test_concurrent_submits_of_one_claim_get_distinct_attempts():
+    from concurrent.futures import ThreadPoolExecutor
+
+    sim = Simulator(clock=lambda: NOW)
+    bad = claim("payer_a", line("C8901"), cid="clm_race")
+    with ThreadPoolExecutor(8) as pool:
+        outs = list(pool.map(lambda _i: sim.submit(bad), range(8)))
+    assert sorted(o["attempt"] for o in outs) == list(range(1, 9))
+
+
+def test_filing_limits_match_each_policy():
+    for insurer, limit in (("payer_a", 90), ("payer_b", 120), ("payer_c", 120)):
+        inside = first_match(claim(insurer, line("G0463"), days_ago=limit), rules_for(insurer, 1))
+        late = first_match(claim(insurer, line("G0463"), days_ago=limit + 1), rules_for(insurer, 1))
+        assert inside is None or inside.carc != "CO-29"
+        assert late is not None and late.carc == "CO-29"
+    assert first_match(claim("payer_c", line("G0463"), days_ago=121), rules_for("payer_c", 2)).carc == "CO-29"
 
 
 def test_payer_b_bulk_denials_are_fast_and_batched():

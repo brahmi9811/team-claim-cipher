@@ -27,7 +27,7 @@ The plan covers emergency department visits (G0383) and clinic visits (G0463) fo
 
 ## Clause 6: Units of service
 
-Effective with this version, diabetes self-management training units and drug units are paid up to the plan's revised maximum for each service line. Units above the maximum on a single line are denied.
+Effective with this version, diabetes self-management training units and observation hours are paid up to the plan's revised maximum for each service line. Units above the maximum on a single line are denied.
 
 ## Clause 7: Referring provider
 

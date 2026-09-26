@@ -1,4 +1,4 @@
-"""Payer C: policy drifter. 6 legitimate rules, 1 planted wrongful behavior.
+"""Payer C: policy drifter. 7 legitimate rules, 1 planted wrongful behavior.
 
 Wrongful: denies emergency and clinic visits for chest or abdominal pain as
 not medically necessary, against the prudent-layperson standard in clause 5.
@@ -15,6 +15,7 @@ from .base import (
     HiddenRule,
     billed_together,
     drop_fix,
+    filed_late,
     first_line,
     has_dx,
     missing_modifier,
@@ -42,6 +43,9 @@ _WRONGFUL = HiddenRule("c_wrong_01", "wrongful", _acute_symptom_visit, "CO-50", 
                        "Denies visits for chest or abdominal pain as not medically necessary.",
                        probability=0.8, contradicts_clause=5)
 
+_TIMELY_FILING = HiddenRule("c_legit_10", "legit", filed_late(120), "CO-29", None,
+                            "Filed more than 120 days after the service (clause 11). Not fixable by the scrubber.")
+
 _SHARED = [
     HiddenRule("c_legit_04", "legit", billed_together({"G0438"}, "G0444"), "CO-97", "M80",
                "Depression screening billed with the initial wellness visit (clause 3).",
@@ -55,6 +59,7 @@ _SHARED = [
 ]
 
 RULES_V1: list[HiddenRule] = [
+    _TIMELY_FILING,
     HiddenRule("c_legit_01", "legit", missing_prior_auth(PRIOR_AUTH_V1), "CO-16", "M62",
                "Prior authorization number missing for trastuzumab, CPAP or G0439 (clause 4, v1).",
                fix=pa_fix(PRIOR_AUTH_V1)),
@@ -69,6 +74,7 @@ RULES_V1: list[HiddenRule] = [
 ]
 
 RULES_V2: list[HiddenRule] = [
+    _TIMELY_FILING,
     HiddenRule("c_legit_07", "legit", missing_prior_auth(PRIOR_AUTH_V2), "CO-16", "M62",
                "Prior authorization number missing for imaging, including tomosynthesis (clause 4, v2).",
                fix=pa_fix(PRIOR_AUTH_V2)),

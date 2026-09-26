@@ -242,8 +242,8 @@ The simulator is a deterministic FastAPI service with three fictional insurers, 
 | Insurer | Personality | Hidden legitimate rules | Planted wrongful behavior |
 | --- | --- | --- | --- |
 | Payer A | Strict but fair | 8 | 1: denies a service its policy covers (clause 7) as `CO-50` in about 10% of cases |
-| Payer B | Algorithmic denier | 5 | 3: auto-denies imaging claims over $2,000 as `CO-50` within 2 seconds, in batches; denies covered follow-up visits; sometimes returns the wrong reason code |
-| Payer C | Policy drifter | 6 | 1, plus the **policy-change button**: 3 hidden rules swap and the published policy gets a new version |
+| Payer B | Algorithmic denier | 6 | 3: auto-denies imaging claims over $2,000 as `CO-50` within 2 seconds, in batches; denies covered follow-up visits; sometimes returns the wrong reason code |
+| Payer C | Policy drifter | 7 | 1, plus the **policy-change button**: 3 hidden rules swap and the published policy gets a new version |
 
 Each insurer has a **published policy** of about 12 numbered clauses (`sim/policies/payer_a.md` and so on). The agents can read these through the `policies` collection; they can never read the hidden rules.
 
@@ -396,7 +396,7 @@ The scorer writes these to `metrics` every 30 seconds, per insurer. It is the on
 | Judge recall (wrongful) | Of truly wrongful denials, share the Judge caught | 70% or higher |
 | Appeal win rate | Appeals overturned / appeals filed | Rises as the Evolver learns each insurer's strategy |
 | Dollars recovered | Sum of `recovered_usd` from overturned appeals | Headline number for the demo |
-| PHI reaching the LLM | Real identifiers found in any LLM request or response | **0**, always |
+| PHI reaching the LLM | Planted identifiers found in any stored LLM output (verdicts, events, rules, tokenized appeal letters). Requests aren't stored; the leak detector blocks them before the call | **0**, always |
 | Leaks blocked | Calls stopped by the leak detector | Grows during the day |
 | Cost per claim | LLM tokens and dollars per processed claim | Shown to answer "is this affordable?" |
 
@@ -441,7 +441,7 @@ Folders, branches, the contracts table and the git workflow are in the [README](
 | `carc`, `rarc` | Denial codes returned |
 | `contradicts_clause` | For wrongful rules: the clause id the denial violates (used by the appeal logic) |
 
-No match means paid. Payer B's bulk rule holds matching claims for up to 2 seconds, then denies them as one batch.
+No match means paid. Payer B's bulk rules answer in under 2 seconds and group denials into 2-second batches: every denial in a batch shares one `adjudicated_at` timestamp and `batch_id`.
 
 *Policy clause document (collection `policies`):* `{_id: "payer_b_v1_c7", insurer, version, clause_no, title, clause_text, current: true}`. Payer C's policy change writes version 2 and sets `current: false` on version 1.
 

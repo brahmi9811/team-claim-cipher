@@ -66,6 +66,18 @@ def test_identifiers_are_guard_safe(claims):
         assert not re.search(r"\d", c["patient"]["name"])
 
 
+def test_extra_rounds_have_new_ids_that_sort_after_round_1(claims):
+    from forge.__main__ import round_prefix
+
+    patients, encounters = fake_synthea()
+    r2 = build_claims(patients, encounters, n=300, seed=43, now=NOW, id_prefix=round_prefix(2))
+    r10 = build_claims(patients, encounters, n=10, seed=51, now=NOW, id_prefix=round_prefix(10))
+    assert r2[0]["_id"] == "clm_r02_00001"
+    assert not {c["_id"] for c in r2} & {c["_id"] for c in claims}
+    assert max(c["_id"] for c in claims) < min(c["_id"] for c in r2) < min(c["_id"] for c in r10)
+    assert sum(c["holdout"] for c in r2) == 60
+
+
 def test_holdout_share(claims):
     assert sum(c["holdout"] for c in claims) == 60
 

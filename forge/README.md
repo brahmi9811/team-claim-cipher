@@ -4,16 +4,23 @@ Turns the Synthea synthetic-patient sample into about 2,000 realistic claims in 
 shape (`common/models.py`), plants red-team PHI, and loads everything into MongoDB.
 
 ```bash
-python -m forge download      # Synthea sample CSVs (about 6 MB) -> data/synthea/csv   (gitignored)
+python -m forge download      # Synthea sample CSVs (about 6 MB) -> data/synthea/csv   (committed, team decision)
 python -m forge build         # 2,000 claims -> data/forge/claims.jsonl (+ phi_canaries.jsonl)
 python -m forge load          # claims (encrypted), policies v1, hashed PHI canaries -> MongoDB
 python -m forge policies      # only (re)publish the policies
 python -m forge all           # download if needed, build, load
+python -m forge extend --rounds 4   # append rounds 2..4 for a long run, then `load` again
 python -m pytest forge/tests
 ```
 
-Options: `--n 2000`, `--seed 42`, `--phi-share 0.05`, `--allow-plaintext` (local dev database only).
+Options: `--n 2000` (per round), `--seed 42`, `--phi-share 0.05`, `--rounds 4`, `--allow-plaintext` (local dev database only).
 Building is deterministic for a given seed. Loading is safe to run twice (only missing claims are inserted).
+
+**Long runs.** At 2 claims per second the orchestrator drains 2,000 claims in about 17 minutes, then falls
+back to its own demo claims, which are never held out, so the acceptance curve stops moving. `extend`
+appends more rounds (a different seed per round, so different samples and paperwork gaps, each with its
+own 20% holdout and 5% planted PHI). Round 1 keeps `clm_00001`; later rounds are `clm_r02_00001`, ...,
+which sort after it, so the orchestrator's `_id` cursor picks them up even mid-run.
 
 ## What a claim looks like
 

@@ -1,4 +1,4 @@
-"""Payer B: algorithmic denier. 5 legitimate rules, 3 planted wrongful behaviors.
+"""Payer B: algorithmic denier. 6 legitimate rules, 3 planted wrongful behaviors.
 
 All three wrongful behaviors come from the same automated system: they are
 decided within 2 seconds and released in batches (shared timestamp and batch
@@ -18,6 +18,7 @@ from .base import (
     billed_together,
     blank,
     drop_fix,
+    filed_late,
     first_line,
     has_dx,
     lines,
@@ -54,6 +55,8 @@ def _wrong_reason_code(claim):
 
 
 RULES_V1: list[HiddenRule] = [
+    HiddenRule("b_legit_06", "legit", filed_late(120), "CO-29", None,
+               "Filed more than 120 days after the service (clause 11). Not fixable by the scrubber."),
     HiddenRule("b_legit_01", "legit", missing_prior_auth(PRIOR_AUTH), "CO-16", "M62",
                "Prior authorization number missing for advanced imaging or trastuzumab (clause 4).",
                fix=pa_fix(PRIOR_AUTH)),

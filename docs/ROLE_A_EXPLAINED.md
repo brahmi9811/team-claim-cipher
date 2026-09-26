@@ -71,7 +71,7 @@ a locked database collection called `sim_truth`.
 |---|---|---|---|
 | Payer A | strict but fair | denies chronic-condition clinic visits (diabetes, kidney disease, high blood pressure) as "not medically necessary", though its clause 7 covers them | cite the right **clause number** |
 | Payer B | algorithmic denier | a robot that denies in bulk within 2 seconds: expensive scans, follow-up visits, and "missing authorization" when the number is right there on the claim | show **2+ similar claims it paid** plus the **denial-pattern numbers** |
-| Payer C | policy drifter | denies emergency visits for chest or abdominal pain, against the "prudent layperson" rule in its clause 5 | **quote the clause word for word** from the *current* policy |
+| Payer C | policy drifter | denies emergency and clinic visits for chest or abdominal pain, against the "prudent layperson" rule in its clause 5 | **quote the clause word for word** from the *current* policy |
 
 A legitimate denial is always upheld on appeal, no matter how good the letter is. So appealing
 everything does not work; the agents have to tell the two kinds apart.
@@ -109,7 +109,7 @@ draws its charts from these rows.
 | Judge recall | of the truly wrongful denials, how many the Judge caught |
 | appeal win rate | how many appeals the insurers overturned |
 | recovered $ | money won back through appeals |
-| PHI leaks to LLM | planted personal data found in anything the AI wrote. **Must stay 0** |
+| PHI leaks to LLM | planted personal data found in anything the AI wrote and we stored (verdicts, events, rules, appeal letters). Prompts aren't stored, so what goes *in* is covered by the firewall's blocking, counted as "leaks blocked". **Must stay 0** |
 | leaks blocked | how many times the firewall stopped personal data |
 
 It is the **only** code allowed to read `sim_truth`. If the agents could read it they would be
@@ -123,14 +123,22 @@ Measured with `python -m sim.report` on the 2,000 claims:
 
 | | Payer A | Payer B | Payer C | All |
 |---|---|---|---|---|
-| Paid at the start (agents know nothing) | 67.5% | 61.6% | 72.9% | **67.5%** |
-| Paid once every fixable mistake is learned | 82.9% | 76.2% | 88.8% | **82.8%** |
+| Paid at the start (agents know nothing) | 67.5% | 60.9% | 71.3% | **66.7%** |
+| Paid once every fixable mistake is learned | 82.9% | 75.1% | 87.1% | **81.8%** |
 
-- Of the denials at the start, about **63% are legitimate** (fixable) and **37% wrongful** (appealable),
+- Of the denials at the start, about **65% are legitimate** (fixable) and **35% wrongful** (appealable),
   close to the 60/40 target in the plan.
-- The climb from about 67% to about 83% is the **learning curve** the demo shows. The rest can't be
-  fixed on the bill, because those denials are wrongful and only an appeal gets that money back.
-- Pressing Payer C's policy-change button drops it from **88.8% to 70.0%** until the agents re-learn.
+- The climb from about 67% to about 82% is the **learning curve** the demo shows. The rest can't be
+  fixed on the bill: the wrongful denials need an appeal, and late-filed claims can't be fixed at all.
+- Pressing Payer C's policy-change button drops it from **87.1% to 68.8%** until the agents re-learn.
+
+### Keeping the curve moving on a long run
+
+At 2 claims per second the orchestrator uses up 2,000 claims in about 17 minutes, and after that only
+demo claims (not held out) arrive, so the acceptance rate stops moving. For the long run, add more
+rounds of claims before starting: `python -m forge extend --rounds 4` then `python -m forge load`
+(8,000 claims; later rounds are `clm_r02_00001`, ... so the orchestrator's cursor picks them up in
+order). Lowering `CLAIM_RATE_PER_SEC` stretches them further.
 
 ---
 
@@ -153,6 +161,7 @@ Synthea ──> forge ──> claims (encrypted in MongoDB) ──> orchestrator
 
 ```bash
 python -m forge all            # download Synthea, build 2,000 claims, load into MongoDB
+python -m forge extend --rounds 4 && python -m forge load   # 8,000 claims for a long run
 python -m sim.report           # check the denial mix
 python -m sim                  # start the insurers on port 8001 (--memory without MongoDB)
 python -m scorer               # start the scoreboard (every 30 s)
