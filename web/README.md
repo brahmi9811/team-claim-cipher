@@ -38,7 +38,7 @@ Open http://localhost:8002. The dot in the top right says `live` when the SSE st
 | `POST /demo/policy-change` | Calls the simulator's `/admin/policy-change/payer_c`; passes through its 409 when Payer C is already on its latest policy |
 | `POST /demo/reset` | Body `{"confirm": "RESET"}`; runs `scripts/reset_demo.py --yes` (or `--restore $DEMO_RESET_SNAPSHOT`) |
 
-**Contract for C (appeal_worker):** in draft-only mode, file appeals where `status == "approved"` and `outcome` is null, then set `status: "filed"` and the `outcome`. Appeals the live view shows as needing approval: `outcome` null, `mode != "auto_file"`, `status` not `approved`/`filed`. (`approved` still needs adding to `AppealStatus` in `common/models.py`, owner B.)
+**Contract for C (appeal_worker):** in draft-only mode, file appeals where `status == "approved"` and `outcome` is null, then set `status: "filed"` and the `outcome`. Appeals the live view shows as needing approval: `outcome` null, `mode != "auto_file"`, `status` not `approved`/`filed`. `orchestrator/appeal_worker.py` implements this.
 
 **Timestamps:** what the loop writes (`adjudicated_at`, `harness_events.ts`, appeal times, `metrics.ts`) is a BSON date, as the orchestrator and simulator write it. Claims' `created_at` and verdicts' `created_at` are ISO strings (forge, `common.models.now_iso`). The API returns both as ISO strings.
 

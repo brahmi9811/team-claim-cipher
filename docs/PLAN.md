@@ -1,6 +1,6 @@
 # Claim Cipher: Product Plan (v2)
 
-The full design: what we are building and why. For **who builds what, and how we work in parallel**, see the [README](../README.md).
+The full design: what we are building and why. For **who builds what, and how we work in parallel**, see [TEAM_WORKFLOW.md](TEAM_WORKFLOW.md).
 
 - [Pitch and TL;DR](#pitch-and-tldr)
 - [The problem](#the-problem)
@@ -410,7 +410,7 @@ The scorer writes these to `metrics` every 30 seconds, per insurer. It is the on
 
 Each member is responsible for their deliverables **and for the specs other people code against**. The specs below are drafts. Confirm them at the 10:30 AM whiteboard session, then they are frozen at 11:00. After that, only the owner changes a spec, and only after telling the team.
 
-Folders, branches, the contracts table and the git workflow are in the [README](../README.md#how-we-work-in-parallel).
+Folders, branches, the contracts table and the git workflow are in [TEAM_WORKFLOW.md](TEAM_WORKFLOW.md#how-we-work-in-parallel).
 
 ### Member A: Simulation and scoring
 
