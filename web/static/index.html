@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claim Cipher</title>
+  <meta name="description" content="Live view of a self-improving agent that learns each insurer, catches wrongful denials and appeals them. Billing operations only.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M9 17l5 5 9-11' stroke='white' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <h1>Claim Cipher</h1>
+      <p class="tag">Learns each insurer · catches wrongful denials · appeals with evidence · <strong>billing operations only</strong></p>
+    </div>
+    <div class="controls">
+      <div class="filter" role="group" aria-label="Insurer filter" id="filter">
+        <button data-ins="" class="on">All</button>
+        <button data-ins="payer_a"><i class="dot s1"></i>Payer A</button>
+        <button data-ins="payer_b"><i class="dot s2"></i>Payer B</button>
+        <button data-ins="payer_c"><i class="dot s3"></i>Payer C</button>
+      </div>
+      <button class="btn" id="btn-policy" title="Payer C publishes a new policy version and swaps 3 hidden rules">Payer C policy change</button>
+      <button class="btn ghost" id="btn-reset" title="Runs scripts/reset_demo.py">Reset demo</button>
+      <span class="conn" id="conn" data-state="connecting"><i></i><span>connecting</span></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="score" aria-label="Scoreboard">
+      <div class="hero">
+        <div class="tile big">
+          <span class="lbl">First-pass acceptance <em>(held-out claims)</em></span>
+          <span class="val" id="m-acc">–</span>
+          <span class="sub" id="m-acc-from">–</span>
+        </div>
+        <div class="tile big">
+          <span class="lbl">Dollars recovered</span>
+          <span class="val" id="m-rec">–</span>
+          <span class="sub" id="m-win">–</span>
+        </div>
+        <div class="tile big phi">
+          <span class="lbl">PHI reaching the LLM</span>
+          <span class="val" id="m-phi">–</span>
+          <span class="sub" id="m-blocked">–</span>
+        </div>
+        <div class="tile">
+          <span class="lbl">Judge precision / recall <em>(wrongful)</em></span>
+          <span class="val sm" id="m-judge">–</span>
+          <span class="sub">targets 85% / 70%</span>
+        </div>
+        <div class="tile">
+          <span class="lbl">Cost per claim</span>
+          <span class="val sm" id="m-cost">–</span>
+          <span class="sub" id="m-at">–</span>
+        </div>
+      </div>
+      <div class="insurers" id="insurers"></div>
+    </section>
+
+    <div class="panels">
+      <section class="panel" aria-labelledby="h-claims">
+        <header><h2 id="h-claims">Claim stream</h2><span class="count" id="c-claims"></span></header>
+        <div class="list" id="claims"><p class="empty">Waiting for claims…</p></div>
+      </section>
+      <section class="panel" aria-labelledby="h-appeals">
+        <header><h2 id="h-appeals">Appeals</h2><span class="count" id="c-appeals"></span></header>
+        <div class="list" id="appeals"><p class="empty">No appeals yet.</p></div>
+      </section>
+      <section class="panel" aria-labelledby="h-events">
+        <header><h2 id="h-events">Harness changes</h2><span class="count" id="c-events"></span></header>
+        <div class="ladder" id="ladder"></div>
+        <div class="list" id="events"><p class="empty">No harness changes yet.</p></div>
+      </section>
+    </div>
+  </main>
+
+  <aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="d-title">
+    <header>
+      <div><span class="kicker" id="d-kicker">Why?</span><h2 id="d-title">–</h2></div>
+      <button class="x" id="d-close" aria-label="Close">×</button>
+    </header>
+    <div class="body" id="d-body"></div>
+  </aside>
+  <div class="scrim" id="scrim"></div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="tip" id="tip" role="tooltip"></div>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

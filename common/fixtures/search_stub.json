@@ -1,0 +1,75 @@
+{
+  "policies": [
+    {
+      "_id": "payer_a_v1_c7",
+      "insurer": "payer_a",
+      "version": 1,
+      "clause_no": 7,
+      "title": "Covered preventive and imaging services",
+      "clause_text": "Payer A covers medically necessary outpatient imaging including G0202 and related follow-up visits when ordered by a treating provider.",
+      "current": true
+    },
+    {
+      "_id": "payer_a_v1_c3",
+      "insurer": "payer_a",
+      "version": 1,
+      "clause_no": 3,
+      "title": "Prior authorization",
+      "clause_text": "Prior authorization is required for annual wellness visit code G0439. Claims without a prior-auth ID may be denied as CO-16.",
+      "current": true
+    },
+    {
+      "_id": "payer_b_v1_c7",
+      "insurer": "payer_b",
+      "version": 1,
+      "clause_no": 7,
+      "title": "Imaging coverage",
+      "clause_text": "Outpatient imaging above two thousand dollars is covered when medically necessary and not subject to automatic denial solely on charge amount.",
+      "current": true
+    },
+    {
+      "_id": "payer_b_v1_c4",
+      "insurer": "payer_b",
+      "version": 1,
+      "clause_no": 4,
+      "title": "Follow-up visits",
+      "clause_text": "Covered follow-up evaluation and management visits after an imaging study are payable under this policy.",
+      "current": true
+    },
+    {
+      "_id": "payer_c_v1_c2",
+      "insurer": "payer_c",
+      "version": 1,
+      "clause_no": 2,
+      "title": "Filing deadline",
+      "clause_text": "Claims must be filed within 90 days of the date of service unless the member is entitled to an extension under state law.",
+      "current": true
+    }
+  ],
+  "adjudications": [
+    {
+      "_id": "adj_stub_paid_1",
+      "claim_id": "clm_80211",
+      "insurer": "payer_b",
+      "status": "paid",
+      "denial_text": "",
+      "paid_amount_usd": 2340
+    },
+    {
+      "_id": "adj_stub_paid_2",
+      "claim_id": "clm_80977",
+      "insurer": "payer_b",
+      "status": "paid",
+      "denial_text": "",
+      "paid_amount_usd": 2100
+    },
+    {
+      "_id": "adj_stub_denied_1",
+      "claim_id": "clm_88412",
+      "insurer": "payer_b",
+      "status": "denied",
+      "denial_text": "CO-50 not medically necessary imaging auto denial bulk pattern",
+      "carc": "CO-50"
+    }
+  ]
+}

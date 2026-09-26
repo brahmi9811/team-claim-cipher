@@ -1,0 +1,61 @@
+# web/ (owner: D)
+
+The live view. It supports the agent; it is not the product. Full specs: [PLAN.md, Member D](../docs/PLAN.md#member-d-demo-and-product).
+
+## Run it
+
+From the repo root, with `.env` filled in (only `MONGODB_URI`, `MONGODB_DB` and `SIM_URL` are needed here):
+
+```
+pip install -e .                           # from pyproject.toml (includes fastapi, uvicorn)
+python scripts/seed_fake.py --live         # fake data + a new claim every second (skip once the real loop runs)
+python -m web.api                          # http://localhost:8002
+```
+
+Open http://localhost:8002. The dot in the top right says `live` when the SSE stream is connected (`live (polling)` if the cluster has no change streams).
+
+## Files
+
+| File | What it does |
+| --- | --- |
+| `api.py` | FastAPI on port 8002: SSE stream fed by change streams, detail endpoints, button endpoints; also serves `static/` |
+| `db.py` | Connection helper: B's `common.db.get_db` (guarded, `agent_worker` role), or `get_raw_db` for admin scripts. Collection names |
+| `static/index.html`, `style.css`, `app.js` | Scoreboard and three panels (claim stream, appeals, harness changes), "Why?" drawer, buttons. Plain HTML + JS, no build step |
+| `static/config.js` | Backend URL, so the same page works locally and on Vercel |
+
+## Endpoints
+
+| Endpoint | What it returns |
+| --- | --- |
+| `GET /stream` | SSE. Events: `adjudication`, `appeal`, `harness_event`, `profile` (each `{op, doc}` or `{op: "delete", id}`), `metrics` (every 5 s), `reset`, `hello` |
+| `GET /adjudications`, `/appeals`, `/events` | Newest first; `?limit=` and `?insurer=` |
+| `GET /adjudications/{id}` | "Why?" for a denial: the Verdict, resolved policy clauses, paid comparables with outcomes, pattern stats, the appeal, the claim (allow-listed fields only, never `patient` or `notes`) |
+| `GET /events/{id}` | "Why?" for a harness change: reason, before/after, evidence ids resolved to adjudications, appeals or rules, earlier changes for that insurer |
+| `GET /appeals/{id}` | Appeal with its tokenized letter |
+| `GET /metrics/latest`, `/metrics/history` | Latest `metrics` per insurer; headline totals come from the scorer's `insurer: "all"` row (summed only if it's missing); history for sparklines |
+| `GET /profiles`, `/health` | Harness profiles (Trust Ladder state); health shows change-stream vs polling mode |
+| `POST /appeals/{id}/approve` | Sets `status: "approved"`, `approved_by: "human"`, `approved_at`. 409 if already approved or decided |
+| `POST /demo/policy-change` | Calls the simulator's `/admin/policy-change/payer_c`; passes through its 409 when Payer C is already on its latest policy |
+| `POST /demo/reset` | Body `{"confirm": "RESET"}`; runs `scripts/reset_demo.py --yes` (or `--restore $DEMO_RESET_SNAPSHOT`) |
+
+**Contract for C (appeal_worker):** in draft-only mode, file appeals where `status == "approved"` and `outcome` is null, then set `status: "filed"` and the `outcome`. Appeals the live view shows as needing approval: `outcome` null, `mode != "auto_file"`, `status` not `approved`/`filed`. (`approved` still needs adding to `AppealStatus` in `common/models.py`, owner B.)
+
+**Timestamps:** what the loop writes (`adjudicated_at`, `harness_events.ts`, appeal times, `metrics.ts`) is a BSON date, as the orchestrator and simulator write it. Claims' `created_at` and verdicts' `created_at` are ISO strings (forge, `common.models.now_iso`). The API returns both as ISO strings.
+
+## Settings (environment)
+
+| Variable | Default | Use |
+| --- | --- | --- |
+| `SIM_URL` | `http://localhost:8001` | Simulator, for the policy-change button |
+| `SIM_ADMIN_TOKEN` | unset | Must match the simulator's `SIM_ADMIN_TOKEN` if it sets one; sent as `X-Admin-Token` by the policy-change button and `reset_demo.py` |
+| `DEMO_BUTTON_TOKEN` | unset | **Set this before exposing the API through a tunnel.** Button endpoints then need header `X-Demo-Token`; the page asks for it once |
+| `DEMO_RESET_SNAPSHOT` | unset | Reset button restores this snapshot instead of wiping (see `scripts/reset_demo.py --save`) |
+| `WEB_PORT` | `8002` | |
+
+## Vercel
+
+Deploy `web/static/` as a static site (Vercel project root directory `web/static`, no build command). Run `api.py` on the laptop behind a tunnel (for example `cloudflared tunnel --url http://localhost:8002`), then either set `API_URL` in `static/config.js` or open the Vercel page once with `?api=https://<tunnel-host>` (remembered per browser; `?api=` with no value clears it).
+
+## Demo shortcuts
+
+Deep links open the "Why?" drawer directly: `/#adj=adj_00123`, `/#event=evt_0931`, `/#appeal=apl_2217`. Bookmark the denial, appeal and harness change you'll show at 0:25, 0:55 and 1:20 of the demo script.
