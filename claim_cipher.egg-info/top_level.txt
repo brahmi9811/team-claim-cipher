@@ -1,9 +1,0 @@
-agents
-common
-firewall
-forge
-orchestrator
-scorer
-sim
-validator
-web
