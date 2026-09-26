@@ -20,7 +20,7 @@ Open http://localhost:8002. The dot in the top right says `live` when the SSE st
 | --- | --- |
 | `api.py` | FastAPI on port 8002: SSE stream fed by change streams, detail endpoints, button endpoints; also serves `static/` |
 | `db.py` | Connection helper: B's `common.db.get_db` (guarded, `agent_worker` role), or `get_raw_db` for admin scripts. Collection names |
-| `static/index.html`, `style.css`, `app.js` | Scoreboard and three panels (claim stream, appeals, harness changes), "Why?" drawer, buttons. Plain HTML + JS, no build step |
+| `static/index.html`, `style.css`, `app.js` | Four tabs (Overview with scoreboard and demo moments, Claims, Appeals, Agent learning), "Why?" drawer, buttons. Plain HTML + JS, no build step |
 | `static/config.js` | Backend URL, so the same page works locally and on Vercel |
 
 ## Endpoints
@@ -59,7 +59,9 @@ Deploy `web/static/` as a static site (Vercel project root directory `web/static
 
 ## Demo shortcuts
 
-Deep links open the "Why?" drawer directly: `/#adj=adj_00123`, `/#event=evt_0931`, `/#appeal=apl_2217`. Bookmark the denial, appeal and harness change you'll show at 0:25, 0:55 and 1:20 of the demo script.
+The page has four tabs: **Overview**, **Claims**, **Appeals** (the badge counts drafts waiting for approval) and **Agent learning**. `?page=claims`, `?page=appeals` or `?page=learning` opens one directly.
+
+The Overview's three **demo moment** cards always show the newest wrongful denial, overturned appeal and harness change, and open their "Why?" drawer in one click, so the 0:25, 0:55 and 1:20 moments of the demo script need no bookmarks. To pin a specific one instead, deep links open the drawer directly: `/#adj=adj_00123`, `/#event=evt_0931`, `/#appeal=apl_2217`.
 
 ## Demo runbook
 
@@ -73,6 +75,12 @@ For whoever drives the laptop. The script itself is in [PLAN.md, 3-minute live d
     - an *Overturned* appeal (appeals panel);
     - a *Profile changed* event by the evolver with a clear reason (harness changes panel).
 4. Record the backup video of the full script; keep it open in another tab.
+
+**About 4:15 PM: switch the LLM on** (the long run uses the free heuristic fallback to save the OpenRouter credit)
+1. In `.env`: `LLM_ENABLED=true` and `CLAIM_RATE_PER_SEC=1` (about $7-8 an hour on Sonnet 5; 2 per second would use $10 in about 40 minutes).
+2. Stop the orchestrator (Ctrl+C) and start it again: `python -m orchestrator.main`. It continues from the database.
+3. Check it: new verdicts in the "Why?" drawer show `Model: sonnet-5` instead of `heuristic-fallback`.
+4. If the credit runs out, the agents fall back to the heuristic on their own; nothing breaks.
 
 **Before going on stage**
 - `/health` shows `"streams"` as `change_stream` for all four collections, and the dot in the top right says `live`.

@@ -81,6 +81,8 @@
     if (dirty.has("events")) renderEvents();
     if (dirty.has("ladder")) renderLadder();
     if (dirty.has("score")) renderScore();
+    if (dirty.has("claims") || dirty.has("appeals") || dirty.has("events")) renderMoments();
+    if (dirty.has("appeals")) renderBadge();
     dirty.clear();
   }
   function schedule(...what) {
@@ -183,20 +185,82 @@
   const renderAppeals = () => renderList($("appeals"), $("c-appeals"), S.appeals, appealRow, "No appeals yet.");
   const renderEvents = () => renderList($("events"), $("c-events"), S.events, eventRow, "No harness changes yet.");
 
+  // Overview "demo moments": the newest example of each thing the demo script shows, one click from the evidence.
+  const SELF_CHANGES = new Set(["profile_changed", "guardrail_added", "permission_changed", "rollback", "rule_promoted"]);
+  const newest = (map, pred) => [...map.values()].filter((d) => visible(d) && pred(d)).sort(byTimeDesc)[0];
+  function setMoment(id, open, docId, head, text) {
+    const el = $(id);
+    el.classList.toggle("idle", !docId);
+    if (docId) { el.dataset.open = open; el.dataset.id = docId; } else { el.removeAttribute("data-open"); el.removeAttribute("data-id"); }
+    el.querySelector(".m-body").innerHTML = docId
+      ? `<div class="m-head">${head}</div><div class="m-text">${text}</div><span class="m-cta">Show the evidence →</span>`
+      : "Waiting for one…";
+  }
+  function renderMoments() {
+    const a = newest(S.adj, (d) => d.verdict && String(d.verdict.label).startsWith("wrongful"));
+    setMoment("hl-denial", "adj", a && a._id,
+      a && `<span class="id">${esc(a.claim_id)}</span>${insTag(a.insurer)}<span class="verdict ${esc(a.verdict.label)}">${esc(VERDICT[a.verdict.label])}</span>`,
+      a && esc(a.verdict.reason));
+    const p = newest(S.appeals, (d) => d.outcome === "overturned");
+    setMoment("hl-appeal", "appeal", p && p._id,
+      p && `<span class="id">${esc(p.claim_id)}</span>${insTag(p.insurer)}${appealStatus(p)}`,
+      p && (() => {
+        const ev = p.evidence || {}, n = (k) => (ev[k] || []).length;
+        const bits = [n("clause_ids") && `${n("clause_ids")} policy clause${n("clause_ids") > 1 ? "s" : ""}`,
+          n("comparable_claim_ids") && `${n("comparable_claim_ids")} paid comparable claims`,
+          ev.pattern_stats && ev.pattern_stats.identical_denials_60s != null && `${ev.pattern_stats.identical_denials_60s} identical denials in 60 s`].filter(Boolean);
+        return esc(`Won with ${bits.join(", ") || "the evidence on file"}.`);
+      })());
+    const e = newest(S.events, (d) => SELF_CHANGES.has(d.type));
+    setMoment("hl-change", "event", e && e._id,
+      e && `<b>${esc(EVENT_TYPE[e.type] || e.type)}</b>${insTag(e.insurer)}`,
+      e && esc(e.reason || ""));
+  }
+  function renderBadge() {
+    const n = [...S.appeals.values()].filter(needsApproval).length;
+    const b = $("b-appeals");
+    b.hidden = !n;
+    b.textContent = n > 99 ? "99+" : String(n);
+  }
+
+  // ---------- pages ----------
+  const PAGES = {
+    overview: ["Overview", "What the agent has achieved since the run started."],
+    claims: ["Claims", "Every claim as the insurers decide it, and the Judge's verdict on each denial."],
+    appeals: ["Appeals", "Evidence-backed appeals for wrongful denials. A human approves until the agent earns auto-file."],
+    learning: ["Agent learning", "How the agent rewrites its own harness: rules, strategy, guardrails and permissions, each with a reason."],
+  };
+  function setPage(name) {
+    if (!PAGES[name]) name = "overview";
+    document.querySelectorAll(".page").forEach((p) => p.classList.toggle("on", p.dataset.page === name));
+    $("tabs").querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.page === name));
+    $("p-title").textContent = PAGES[name][0];
+    $("p-sub").textContent = PAGES[name][1];
+    store.set("cc_page", name);
+    window.scrollTo(0, 0);
+  }
+  $("tabs").addEventListener("click", (ev) => { const b = ev.target.closest("button[data-page]"); if (b) setPage(b.dataset.page); });
+  document.querySelector("[data-page-link]").addEventListener("click", (ev) => { ev.preventDefault(); setPage("overview"); });
+  setPage(params.get("page") || store.get("cc_page") || "overview");  // ?page=appeals opens a page directly
+
   function renderLadder() {
     $("ladder").innerHTML = INSURERS.map((ins) => {
       const p = S.profiles.get(ins);
       if (!p) return `<div><b>${INS_NAME[ins]}</b><span>no profile</span></div>`;
       const mode = (p.permissions && p.permissions.appeals) || "draft_only";
-      return `<div><b><i class="dot ${INS_SLOT[ins]}"></i>${INS_NAME[ins]} · v${esc(p.version)}</b>
-        <span>${mode === "auto_file" ? '<span class="pill auto">auto-file</span>' : '<span class="pill draft">draft-only</span>'}</span>
-        <span>lead: ${esc((p.appeal_strategy || {}).lead_with || "–")} · min conf ${esc((p.judge || {}).min_confidence ?? "–")}</span></div>`;
+      const learned = ((p.guardrails || {}).learned || []).join(", ") || "none yet";
+      return `<div><b><i class="dot ${INS_SLOT[ins]}"></i>${INS_NAME[ins]} · profile v${esc(p.version)}</b>
+        <span>${mode === "auto_file" ? '<span class="pill auto">auto-file (earned)</span>' : '<span class="pill draft">draft-only</span>'}</span>
+        <span>appeals lead with <b style="font-size:13px">${esc((p.appeal_strategy || {}).lead_with || "–")}</b>${(p.appeal_strategy || {}).quote_clause_verbatim ? ", clause quoted word for word" : ""}</span>
+        <span>Judge confidence bar ${esc((p.judge || {}).min_confidence ?? "–")} · bulk at ${esc((p.judge || {}).bulk_min_identical ?? "–")} in ${esc((p.judge || {}).bulk_window_sec ?? "–")} s</span>
+        <span>learned guardrails: ${esc(learned)}</span></div>`;
     }).join("");
   }
 
   // ---------- rendering: scoreboard ----------
+  const SPARK_W = 360;
   function spark(ins, rows) {
-    const W = 180, H = 48, P = 3;
+    const W = SPARK_W, H = 56, P = 4;
     const pts = rows.filter((r) => r.acceptance_rate != null);
     if (pts.length < 2) return `<svg class="spark" viewBox="0 0 ${W} ${H}"></svg>`;
     const ys = pts.map((r) => r.acceptance_rate);
@@ -237,9 +301,9 @@
     $("insurers").innerHTML = ins.map((i) => {
       const d = (m.insurers || {})[i] || {};
       const p = S.profiles.get(i);
-      const perm = p && p.permissions && p.permissions.appeals === "auto_file" ? "auto-file" : "draft-only";
-      return `<div class="ins">
-        <h3><span><i class="dot ${INS_SLOT[i]}"></i>${INS_NAME[i]}</span><span class="perm">appeals: ${perm}</span></h3>
+      const auto = p && p.permissions && p.permissions.appeals === "auto_file";
+      return `<div class="card ins">
+        <h3><span><i class="dot ${INS_SLOT[i]}"></i>${INS_NAME[i]}</span>${auto ? '<span class="pill auto">appeals: auto-file</span>' : '<span class="pill draft">appeals: draft-only</span>'}</h3>
         <div class="nums">
           <span><b>${pct(d.acceptance_rate)}</b>acceptance</span>
           <span><b>${pct(d.appeal_win_rate)}</b>appeal wins</span>
@@ -261,7 +325,7 @@
     const f = Math.min(1, Math.max(0, (ev.clientX - box.left) / box.width));
     const i = Math.round(f * (rows.length - 1));
     const cross = svg.querySelector(".cross");
-    const cx = 3 + (i / Math.max(1, rows.length - 1)) * 174;
+    const cx = 4 + (i / Math.max(1, rows.length - 1)) * (SPARK_W - 8);
     cross.setAttribute("x1", cx); cross.setAttribute("x2", cx); cross.style.display = "";
     tip.innerHTML = `<b>${pct(rows[i].acceptance_rate, 1)}</b> acceptance · ${time(rows[i].ts)}`;
     tip.style.display = "block";

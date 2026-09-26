@@ -18,12 +18,15 @@ load_dotenv()
 log = logging.getLogger(__name__)
 
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+# LLM_ENABLED=false keeps the key in .env but runs every agent on its heuristic fallback,
+# so a long run spends nothing and the credit is saved for the demo. Default: on.
+LLM_ENABLED = os.environ.get("LLM_ENABLED", "true").strip().lower() not in {"0", "false", "no", "off"}
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 LANGSMITH_API_KEY = os.environ.get("LANGSMITH_API_KEY", "")
 LANGSMITH_PROJECT = os.environ.get("LANGSMITH_PROJECT", "claim-cipher")
 
 # Default models from the plan
-MODEL_SONNET = "anthropic/claude-sonnet-4"
+MODEL_SONNET = "anthropic/claude-sonnet-5"
 MODEL_HAIKU = "anthropic/claude-haiku-4.5"
 
 # USD per million tokens (input, output), used only when OpenRouter doesn't report a cost.
@@ -58,6 +61,8 @@ def call_llm(
     )
     if not OPENROUTER_API_KEY:
         raise LLMUnavailable("OPENROUTER_API_KEY not set")
+    if not LLM_ENABLED:
+        raise LLMUnavailable("LLM_ENABLED=false")
     raw, usage = _call_openrouter(system, guarded_prompt, model, json_mode=json_mode)
     _log_call(model=model, insurer=insurer, claim_id=claim_id, usage=usage)
     guarded_raw = guard(

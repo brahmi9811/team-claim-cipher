@@ -5,75 +5,106 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Claim Cipher</title>
   <meta name="description" content="Live view of a self-improving agent that learns each insurer, catches wrongful denials and appeals them. Billing operations only.">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%232a78d6'/><path d='M9 17l5 5 9-11' stroke='white' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='9' fill='%231d4ed8'/><path d='M9 17l5 5 9-11' stroke='white' stroke-width='3.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <header class="top">
-    <div class="brand">
-      <h1>Claim Cipher</h1>
-      <p class="tag">Learns each insurer · catches wrongful denials · appeals with evidence · <strong>billing operations only</strong></p>
+  <header class="nav">
+    <div class="nav-in">
+      <a class="brand" href="#" data-page-link="overview" aria-label="Claim Cipher, overview">
+        <span class="logo" aria-hidden="true"><svg viewBox="0 0 32 32"><rect width="32" height="32" rx="9"/><path d="M9 17l5 5 9-11"/></svg></span>
+        <span><b>Claim Cipher</b><small>Billing operations only</small></span>
+      </a>
+      <nav class="tabs" id="tabs" aria-label="Pages">
+        <button data-page="overview" class="on">Overview</button>
+        <button data-page="claims">Claims</button>
+        <button data-page="appeals">Appeals <span class="badge" id="b-appeals" hidden></span></button>
+        <button data-page="learning">Agent learning</button>
+      </nav>
+      <div class="nav-actions">
+        <span class="conn" id="conn" data-state="connecting"><i></i><span>connecting</span></span>
+        <button class="btn ghost" id="btn-reset" title="Runs scripts/reset_demo.py">Reset</button>
+        <button class="btn" id="btn-policy" title="Payer C publishes a new policy version and swaps 3 hidden rules">Payer C policy change</button>
+      </div>
     </div>
-    <div class="controls">
+  </header>
+
+  <div class="toolbar">
+    <div class="toolbar-in">
+      <div class="page-title"><h1 id="p-title">Overview</h1><p id="p-sub">What the agent has achieved since the run started.</p></div>
       <div class="filter" role="group" aria-label="Insurer filter" id="filter">
-        <button data-ins="" class="on">All</button>
+        <button data-ins="" class="on">All insurers</button>
         <button data-ins="payer_a"><i class="dot s1"></i>Payer A</button>
         <button data-ins="payer_b"><i class="dot s2"></i>Payer B</button>
         <button data-ins="payer_c"><i class="dot s3"></i>Payer C</button>
       </div>
-      <button class="btn" id="btn-policy" title="Payer C publishes a new policy version and swaps 3 hidden rules">Payer C policy change</button>
-      <button class="btn ghost" id="btn-reset" title="Runs scripts/reset_demo.py">Reset demo</button>
-      <span class="conn" id="conn" data-state="connecting"><i></i><span>connecting</span></span>
     </div>
-  </header>
+  </div>
 
   <main>
-    <section class="score" aria-label="Scoreboard">
+    <!-- Overview -->
+    <section class="page on" data-page="overview" aria-label="Overview">
       <div class="hero">
-        <div class="tile big">
-          <span class="lbl">First-pass acceptance <em>(held-out claims)</em></span>
+        <div class="card stat">
+          <span class="lbl">First-pass acceptance <em>held-out claims</em></span>
           <span class="val" id="m-acc">–</span>
           <span class="sub" id="m-acc-from">–</span>
         </div>
-        <div class="tile big">
+        <div class="card stat">
           <span class="lbl">Dollars recovered</span>
           <span class="val" id="m-rec">–</span>
           <span class="sub" id="m-win">–</span>
         </div>
-        <div class="tile big phi">
+        <div class="card stat phi">
           <span class="lbl">PHI reaching the LLM</span>
           <span class="val" id="m-phi">–</span>
           <span class="sub" id="m-blocked">–</span>
         </div>
-        <div class="tile">
-          <span class="lbl">Judge precision / recall <em>(wrongful)</em></span>
-          <span class="val sm" id="m-judge">–</span>
-          <span class="sub">targets 85% / 70%</span>
-        </div>
-        <div class="tile">
-          <span class="lbl">Cost per claim</span>
-          <span class="val sm" id="m-cost">–</span>
-          <span class="sub" id="m-at">–</span>
-        </div>
       </div>
+
+      <div class="minor">
+        <div class="card mini-stat"><span class="lbl">Judge precision / recall <em>wrongful calls</em></span><span class="val" id="m-judge">–</span><span class="sub">targets 85% / 70%</span></div>
+        <div class="card mini-stat"><span class="lbl">Cost per claim</span><span class="val" id="m-cost">–</span><span class="sub" id="m-at">–</span></div>
+      </div>
+
+      <h2 class="section">Demo moments <span>click to open the evidence</span></h2>
+      <div class="moments">
+        <div class="card moment" id="hl-denial" role="button" tabindex="0"><span class="step">1</span><span class="lbl">Latest wrongful denial caught</span><div class="m-body">Waiting for one…</div></div>
+        <div class="card moment" id="hl-appeal" role="button" tabindex="0"><span class="step">2</span><span class="lbl">Latest appeal overturned</span><div class="m-body">Waiting for one…</div></div>
+        <div class="card moment" id="hl-change" role="button" tabindex="0"><span class="step">3</span><span class="lbl">Latest harness change</span><div class="m-body">Waiting for one…</div></div>
+      </div>
+
+      <h2 class="section">Insurers <span>acceptance over time, appeal mode earned by the Trust Ladder</span></h2>
       <div class="insurers" id="insurers"></div>
     </section>
 
-    <div class="panels">
-      <section class="panel" aria-labelledby="h-claims">
+    <!-- Claims -->
+    <section class="page" data-page="claims" aria-labelledby="h-claims">
+      <div class="card panel">
         <header><h2 id="h-claims">Claim stream</h2><span class="count" id="c-claims"></span></header>
         <div class="list" id="claims"><p class="empty">Waiting for claims…</p></div>
-      </section>
-      <section class="panel" aria-labelledby="h-appeals">
-        <header><h2 id="h-appeals">Appeals</h2><span class="count" id="c-appeals"></span><button class="approve" id="btn-approve-all" title="Approve the 20 oldest drafts for the insurer shown (or all insurers)">Approve drafts</button></header>
+      </div>
+    </section>
+
+    <!-- Appeals -->
+    <section class="page" data-page="appeals" aria-labelledby="h-appeals">
+      <div class="card panel">
+        <header><h2 id="h-appeals">Appeals</h2><span class="count" id="c-appeals"></span><button class="btn sm" id="btn-approve-all" title="Approve the 20 oldest drafts for the insurer shown (or all insurers)">Approve drafts</button></header>
         <div class="list" id="appeals"><p class="empty">No appeals yet.</p></div>
-      </section>
-      <section class="panel" aria-labelledby="h-events">
+      </div>
+    </section>
+
+    <!-- Agent learning -->
+    <section class="page" data-page="learning" aria-labelledby="h-events">
+      <div class="ladder" id="ladder"></div>
+      <div class="card panel">
         <header><h2 id="h-events">Harness changes</h2><span class="count" id="c-events"></span></header>
-        <div class="ladder" id="ladder"></div>
         <div class="list" id="events"><p class="empty">No harness changes yet.</p></div>
-      </section>
-    </div>
+      </div>
+    </section>
   </main>
 
   <aside class="drawer" id="drawer" aria-hidden="true" aria-labelledby="d-title">
