@@ -59,3 +59,23 @@ Deploy `web/static/` as a static site (Vercel project root directory `web/static
 ## Demo shortcuts
 
 Deep links open the "Why?" drawer directly: `/#adj=adj_00123`, `/#event=evt_0931`, `/#appeal=apl_2217`. Bookmark the denial, appeal and harness change you'll show at 0:25, 0:55 and 1:20 of the demo script.
+
+## Demo runbook
+
+For whoever drives the laptop. The script itself is in [PLAN.md, 3-minute live demo](../docs/PLAN.md#3-minute-live-demo).
+
+**About 4:00 PM**
+1. `python scripts/reset_demo.py --save before-judging` (read-only snapshot of the long run).
+2. Set `DEMO_RESET_SNAPSHOT=before-judging` in `.env` and restart `python -m web.api`, so the Reset button restores the snapshot instead of wiping.
+3. Pick the three demo moments in the live view and bookmark their deep links:
+    - a Payer B denial with verdict *Wrongful · bulk* (claim stream, filter Payer B);
+    - an *Overturned* appeal (appeals panel);
+    - a *Profile changed* event by the evolver with a clear reason (harness changes panel).
+4. Record the backup video of the full script; keep it open in another tab.
+
+**Before going on stage**
+- `/health` shows `"streams"` as `change_stream` for all four collections, and the dot in the top right says `live`.
+- The simulator is up (the policy-change button needs it). Payer C must still be on version 1, or the button returns 409 "already at its latest policy version".
+- If the tunnel is flaky, demo from http://localhost:8002 and keep the Vercel link for the submission.
+
+**If something breaks:** press Reset (type `RESET`). With `DEMO_RESET_SNAPSHOT` set, it restores the 4:00 PM state in a few seconds.

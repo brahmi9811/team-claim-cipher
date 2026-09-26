@@ -30,10 +30,10 @@ Put your name next to your role. **Each role owns its folders.** You only edit y
 
 | Role | Owner | Owns these folders | Branch prefix |
 | --- | --- | --- | --- |
-| **A: Simulation and scoring** | ___ | `forge/`, `sim/`, `scorer/` | `a/` |
-| **B: MongoDB and security** | ___ | `common/`, `firewall/`, `validator/`, `scripts/setup_db.py` | `b/` |
-| **C: Agents** | ___ | `agents/`, `orchestrator/`, `scripts/smoke.py` | `c/` |
-| **D: Demo and product** | ___ | `web/`, `scripts/seed_fake.py`, `scripts/reset_demo.py`, `README.md` | `d/` |
+| **A: Simulation and scoring** | Chinmayee Narendra Mayekar | `forge/`, `sim/`, `scorer/` | `a/` |
+| **B: MongoDB and security** | Anushka Dilip Pandit | `common/`, `firewall/`, `validator/`, `scripts/setup_db.py` | `b/` |
+| **C: Agents** | Sakshi Sunil Deshpande | `agents/`, `orchestrator/`, `scripts/smoke.py` | `c/` |
+| **D: Demo and product** | Brahmi Bhalchandra Dalvi | `web/`, `scripts/seed_fake.py`, `scripts/reset_demo.py`, `README.md` | `d/` |
 
 With three people: A and D merge. The simulator comes first, the live view after 2:30 PM.
 
@@ -172,7 +172,8 @@ C is the most dependent role, so **A and B are on the critical path**. Their stu
 - [x] Policy-change and reset buttons; `reset_demo.py` restores a known state in under 1 minute
 - [ ] Deploy the live view to Vercel (hosting decided by 3:30 PM)
 - [ ] Record a **backup video** of the full demo by 4:15
-- [ ] README "What we built at the event" section; 1-minute video recorded on-site; submission by 4:45
+- [x] README "Setup and running" and "What we built at the event" drafted (provenance TODO still open)
+- [ ] 1-minute video recorded on-site; submission by 4:45
 - [ ] Keep time: call every checkpoint below
 
 **Done by 1:00 PM:** live view shows real claims flowing.
@@ -227,7 +228,7 @@ Workers can restart at any time; the database keeps the history, so the long run
 claim-cipher/
   README.md              # D: this file
   docs/PLAN.md           # full product plan
-  .env.example           # MONGODB_URI, OPENROUTER_API_KEY, LANGSMITH_API_KEY, KEY_FILE path
+  .env.example           # every setting the code reads, with defaults
   pyproject.toml         # B creates; anyone adds dependencies
   common/                # B: db.py, models.py, rules.py, search.py, llm.py, profiles.py
   forge/                 # A: Synthea loader, code mapping, PHI planting, policy loader
@@ -248,12 +249,24 @@ claim-cipher/
 
 ## Setup and running
 
-*Filled in on Saturday as the pieces land. Planned:*
+1. Python 3.12 or later. Install with `pip install -e .` (add `".[embeddings]"` for local Vector Search embeddings).
+2. Copy `.env.example` to `.env` and fill in at least `MONGODB_URI`. Never commit `.env` or the key file.
+3. One-time setup, in this order:
+    ```
+    python scripts/setup_db.py      # collections, indexes, time-series metrics, roles (B)
+    python -m forge all             # 2,000 claims (encrypted), policies, PHI canaries (A)
+    python -m forge extend --rounds 4 && python -m forge load   # more claims for the long run (see below)
+    ```
+4. Run the system, one terminal each:
+    ```
+    python -m sim                   # insurer simulator, http://localhost:8001
+    python -m orchestrator.main     # the agent loop (only ONE against the shared cluster)
+    python -m scorer                # metrics every 30 s
+    python -m web.api               # live view, http://localhost:8002
+    ```
+5. Check it: `python scripts/smoke.py` (C's end-to-end test, own database) and open http://localhost:8002.
 
-1. Python 3.12. Install with `pip install -e .`
-2. Copy `.env.example` to `.env` and fill in your keys. Never commit `.env`.
-3. `python scripts/setup_db.py` creates collections and indexes (run once, by B).
-4. Start the simulator, the orchestrator and the live view (exact commands added by each owner).
+Without an `OPENROUTER_API_KEY` every agent falls back to its deterministic heuristic, so the loop still runs end to end.
 
 **Claims and policies (A):** `python -m forge all` downloads the Synthea sample, builds 2,000 claims and loads claims (encrypted), policies and hashed PHI canaries. For the long run, add more first with `python -m forge extend --rounds 4` then `python -m forge load` (2,000 claims last only about 17 minutes at 2 per second). `python -m sim.report` shows the denial mix. Details: [forge/README.md](forge/README.md).
 
@@ -273,6 +286,23 @@ claim-cipher/
 
 ## What we built at the event
 
-*For the judges. Filled in on Saturday by D: every component above was written on Sept 26, 2026, starting at 10:30 AM. The commit history shows it. Any official boilerplate we reused is listed here.*
+*For the judges.*
+
+> **TODO (D, before submitting):** state honestly when and where this code was written, and link the working repo's commit history if it lives elsewhere. This repository starts with a single `Initial code` import commit, so its own history does not show the day's work.
+
+| Component | What it does | Where |
+| --- | --- | --- |
+| Data Forge | Synthea patients and encounters → ~2,000 claims on a public ICD-10-CM / HCPCS Level II code set; PHI planted in ~5% of notes; 20% held out | `forge/` |
+| Insurer simulator | Deterministic FastAPI service, 3 insurers with hidden rules, planted wrongful behavior, per-insurer appeal logic, Payer C policy change | `sim/` |
+| Scorer | The only code that reads ground truth; writes acceptance, Judge precision/recall, appeal wins, dollars recovered, PHI leaks every 30 s | `scorer/` |
+| PHI firewall | Queryable Encryption on patient fields, tokenization before the LLM, leak detector on every LLM request and response | `firewall/` |
+| Rule validator | Replays candidate rules and Judge thresholds over past claims with aggregation pipelines; promotes, rejects or retires | `validator/` |
+| Agents | Scrubber, Judge, Appeal Writer, Evolver (bounded self-changes with automatic rollback), Trust Ladder | `agents/` |
+| Orchestrator | Async loop: tokenize → scrub → submit → judge → appeal, Evolver cycles, filing of human-approved appeals | `orchestrator/` |
+| Live view | Scoreboard, claim stream, appeals with approve button, harness changes, "Why?" drawer, all fed by MongoDB change streams over SSE | `web/` |
+
+**MongoDB features doing real work:** Queryable Encryption on patient fields (`claims`, `phi_tokens`), Vector Search (`policies_vector` for clause retrieval; `adjudications_vector` for denial clustering once built), change streams (hot reload of harness profiles; the live view), time-series collection (`metrics`), aggregation pipelines (rule replay, bulk-denial stats), database roles (agents cannot read `sim_truth`). *D: confirm each of these on the demo cluster before submitting, and drop any that isn't live.*
+
+**Official boilerplate reused:** none that we know of (confirm with each owner before submitting).
 
 **Public data and tools used:** [Synthea](https://github.com/synthetichealth/synthea) synthetic patients (the sample CSVs are committed in `data/synthea/`), ICD-10-CM and HCPCS Level II code sets, CARC/RARC denial code definitions, MongoDB Atlas.

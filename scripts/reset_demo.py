@@ -13,8 +13,10 @@ long-run history. Prefer restoring a snapshot of the real long run instead.
 harness_profiles, metrics, phi_incidents, plus the orchestrator's orchestrator_state,
 evolver_state and llm_calls. Claims, policies, phi_tokens and the key
 vault are never touched (only Payer C's policy is pointed back at version 1 on a
-fresh reset). sim_truth is never read; on reset, truth rows for adjudications that
-no longer exist are deleted so the scorer stays consistent.
+fresh reset). sim_truth is never read by this script: --save copies its adjudication
+rows server side (kept in sim_truth as type "snapshot_truth") and --restore puts them
+back; a fresh reset deletes truth rows for adjudications that no longer exist, so the
+scorer stays consistent.
 
 A fresh reset also puts Payer C's policy back to version 1 through the simulator's
 /admin/policy-reset/payer_c (set SIM_ADMIN_TOKEN if the simulator requires one).
@@ -61,6 +63,7 @@ def save(db, name):
                 n += 1
             counts[coll] = n
     print(f"Saved {path}: {counts}")
+    save_truth(db, name)
 
 
 def clear_collection(db, coll):
@@ -77,6 +80,44 @@ def clear_collection(db, coll):
 def insert_batches(db, coll, docs):
     for i in range(0, len(docs), BATCH):
         db[coll].insert_many(docs[i : i + BATCH], ordered=False)
+
+
+def save_truth(db, name):
+    """Copy the adjudication ground truth into the snapshot, server side: the rows go from sim_truth
+    back into sim_truth (type "snapshot_truth", ignored by the scorer and the simulator) and never
+    pass through this script. Without it, a restore after a fresh wipe leaves the scoreboard blank
+    and the simulator can't decide appeals on the restored denials."""
+    truth = db[dbm.SIM_TRUTH]
+    try:
+        truth.delete_many({"type": "snapshot_truth", "snapshot": name})
+        truth.aggregate([
+            {"$match": {"type": "adjudication"}},
+            {"$project": {"_id": {"$concat": [f"snapshot:{name}:", {"$toString": "$_id"}]},
+                          "type": {"$literal": "snapshot_truth"}, "snapshot": {"$literal": name}, "truth": "$$ROOT"}},
+            {"$merge": {"into": dbm.SIM_TRUTH, "whenMatched": "replace", "whenNotMatched": "insert"}},
+        ])
+        print(f"  sim_truth: {truth.count_documents({'type': 'snapshot_truth', 'snapshot': name})} truth rows kept with the snapshot")
+    except Exception as exc:  # noqa: BLE001 - this user may not have access to sim_truth
+        print(f"  sim_truth: not saved ({exc.__class__.__name__}: {exc}); a restore will only prune it")
+
+
+def restore_truth(db, name):
+    """Put back the ground truth saved with the snapshot. Returns False if there is none (older snapshot)."""
+    truth = db[dbm.SIM_TRUTH]
+    try:
+        if not truth.count_documents({"type": "snapshot_truth", "snapshot": name}, limit=1):
+            return False
+        truth.delete_many({"type": "adjudication"})
+        truth.aggregate([
+            {"$match": {"type": "snapshot_truth", "snapshot": name}},
+            {"$replaceWith": "$truth"},
+            {"$merge": {"into": dbm.SIM_TRUTH, "whenMatched": "replace", "whenNotMatched": "insert"}},
+        ])
+        print(f"  sim_truth: restored {truth.count_documents({'type': 'adjudication'})} truth rows from the snapshot")
+        return True
+    except Exception as exc:  # noqa: BLE001
+        print(f"  sim_truth: restore failed ({exc.__class__.__name__}: {exc})")
+        return False
 
 
 def prune_truth(db):
@@ -110,7 +151,8 @@ def restore(db, name):
         cleared = clear_collection(db, coll)
         insert_batches(db, coll, docs[coll])
         print(f"  {coll}: cleared {cleared}, restored {len(docs[coll])}")
-    prune_truth(db)
+    if not restore_truth(db, name):
+        prune_truth(db)
 
 
 def fresh(db):
