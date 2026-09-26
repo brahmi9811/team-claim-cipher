@@ -63,7 +63,10 @@ def classify(adjudication: dict, claim: dict, profile: dict) -> dict:
 
     try:
         verdict = _classify_with_llm(adjudication, claim, policy_hits, comparable, pattern_stats)
-    except llm.LLMUnavailable:
+    except (llm.LLMUnavailable, KeyError, TypeError, ValueError):
+        # KeyError/TypeError/ValueError: the LLM returned valid JSON but not the
+        # expected shape (a missing field, or a `confidence` that isn't a number) --
+        # same fallback as a missing key, not something to let crash this claim.
         verdict = _classify_heuristic(adjudication, claim, policy_hits, comparable, pattern_stats, profile)
     except PHILeak as exc:
         # A hit here means real PHI (or something that looks like it) reached
