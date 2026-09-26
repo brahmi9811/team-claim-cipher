@@ -400,6 +400,30 @@ def approve_appeal(appeal_id: str, request: Request, x_demo_token: str | None = 
     return clean(res)
 
 
+@app.post("/appeals/approve-all")
+async def approve_all(request: Request, x_demo_token: str | None = Header(None)):
+    """Human bulk approval of draft appeals (optionally one insurer, oldest first).
+
+    Body: {"insurer": "payer_b" | null, "limit": 20}. The Trust Ladder only earns auto-file from
+    decided appeals, so without approvals no appeal is ever decided in draft-only mode.
+    """
+    check_token(x_demo_token)
+    body = await request.json() if await request.body() else {}
+    insurer, limit = body.get("insurer"), min(int(body.get("limit") or 20), 200)
+    q = {"outcome": None, "mode": {"$ne": "auto_file"}, "status": {"$nin": ["approved", "filed"]}}
+    if insurer:
+        q["insurer"] = insurer
+    coll = get(request)[dbm.APPEALS]
+    ids = [a["_id"] for a in coll.find(q, {"_id": 1}).sort("created_at", 1).limit(limit)]
+    if not ids:
+        return {"approved": 0, "ids": []}
+    res = coll.update_many(
+        {**q, "_id": {"$in": ids}},
+        {"$set": {"status": "approved", "approved_by": "human", "approved_at": datetime.now(timezone.utc)}},
+    )
+    return {"approved": res.modified_count, "ids": ids}
+
+
 @app.post("/demo/policy-change")
 def policy_change(x_demo_token: str | None = Header(None)):
     check_token(x_demo_token)

@@ -99,7 +99,12 @@ def main() -> int:
     check("patient_token set", tok["patient_token"].startswith("PATIENT_"))
     check("age_band set", "-" in tok["age_band"])
     check("state extracted", tok["state"] == "MA")
-    check("notes removed by default", tok["notes_redacted"] is None)
+    check("notes: DOB and phone redacted by default",
+          "04/12/1961" not in tok["notes_redacted"] and "555-999-8888" not in tok["notes_redacted"])
+    strict = {**profile, "guardrails": {"fixed": [], "learned": ["redact_notes_strict"]}}
+    check("notes: fully masked with redact_notes_strict", set(tokenize(full_claim, profile=strict)["notes_redacted"]) <= {"*", " "})
+    dropped = {**profile, "guardrails": {"fixed": [], "learned": ["drop_notes_field"]}}
+    check("notes: removed with drop_notes_field", tokenize(full_claim, profile=dropped)["notes_redacted"] is None)
     check("no raw name in tokenized", "Jane" not in str(tok))
 
     clean = guard("Appeal for PATIENT_0001 regarding imaging.", direction="request", insurer="payer_a", claim_id="clm_test")

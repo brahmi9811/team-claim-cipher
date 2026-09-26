@@ -52,9 +52,11 @@ def _patient_values_for_claim(claim_id: str | None) -> list[str]:
     try:
         db = dbmod.get_db("firewall")
         # Prefer phi_tokens via claim_ids
-        token_doc = db[dbmod.PHI_TOKENS].find_one({"claim_ids": claim_id})
-        if token_doc and token_doc.get("patient_ref"):
-            ref = token_doc["patient_ref"]
+        token_doc = db[dbmod.PHI_TOKENS].find_one({"claim_ids": claim_id}, {"_id": 1})
+        # lookup_patient decrypts patient_ref; read raw, an encrypted ref is Binary and
+        # the exact-match check silently found nothing.
+        ref = lookup_patient(token_doc["_id"]) if token_doc else None
+        if ref:
             for key in ("name", "dob", "member_id", "ssn", "phone", "address"):
                 val = ref.get(key)
                 if val:

@@ -276,7 +276,7 @@ class JudgeConfig(BaseModel):
 
     min_confidence: float = 0.75
     bulk_window_sec: int = 60
-    bulk_min_identical: int = 20
+    bulk_min_identical: int = 5  # matches default_harness_profile
 
 
 class AppealStrategy(BaseModel):
@@ -366,7 +366,10 @@ def default_harness_profile(insurer: str) -> dict[str, Any]:
         "judge": {
             "min_confidence": 0.75,
             "bulk_window_sec": 60,
-            "bulk_min_identical": 20,
+            # At the demo's 2 claims/s, Payer B's bursts reach about 8 identical denials a
+            # minute, so 20 never fired. 5 is the Evolver's lower bound; the Judge also
+            # requires a sub-2-second median latency before calling a burst bulk.
+            "bulk_min_identical": 5,
         },
         "appeal_strategy": {
             "lead_with": "clause",

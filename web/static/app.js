@@ -402,6 +402,20 @@
     catch (e) { toast(`Policy change failed: ${e.message}`); }
     finally { b.disabled = false; }
   };
+  $("btn-approve-all").onclick = async () => {
+    const pending = [...S.appeals.values()].filter((p) => visible(p) && needsApproval(p)).length;
+    const who = S.filter ? INS_NAME[S.filter] : "all insurers";
+    if (!confirm(`Approve up to 20 draft appeals for ${who} (${pending} waiting in view)? The orchestrator files them.`)) return;
+    const b = $("btn-approve-all"); b.disabled = true;
+    try {
+      const r = await api("/appeals/approve-all", { method: "POST", body: JSON.stringify({ insurer: S.filter || null, limit: 20 }) });
+      const ids = new Set(r.ids);
+      for (const p of S.appeals.values()) if (ids.has(p._id) && needsApproval(p)) p.status = "approved";
+      schedule("appeals");
+      toast(`${r.approved} appeal${r.approved === 1 ? "" : "s"} approved; the orchestrator will file them.`);
+    } catch (e) { toast(`Approve failed: ${e.message}`); }
+    finally { b.disabled = false; }
+  };
   $("btn-reset").onclick = async () => {
     if (prompt("This resets the demo state in MongoDB. Only do this if the live demo is broken.\nType RESET to continue:") !== "RESET") return;
     const b = $("btn-reset"); b.disabled = true; toast("Resetting…");

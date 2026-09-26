@@ -51,12 +51,13 @@ def call_llm(
     """
     from firewall.guard import guard
 
-    if not OPENROUTER_API_KEY:
-        raise LLMUnavailable("OPENROUTER_API_KEY not set")
-
+    # Guard before the key check: the leak detector sees every prompt the agents
+    # build, so a PHI leak is blocked (and logged) even when running without a key.
     guarded_prompt = guard(
         prompt, direction="request", insurer=insurer, claim_id=claim_id
     )
+    if not OPENROUTER_API_KEY:
+        raise LLMUnavailable("OPENROUTER_API_KEY not set")
     raw, usage = _call_openrouter(system, guarded_prompt, model, json_mode=json_mode)
     _log_call(model=model, insurer=insurer, claim_id=claim_id, usage=usage)
     guarded_raw = guard(

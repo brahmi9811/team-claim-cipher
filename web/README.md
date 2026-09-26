@@ -35,6 +35,7 @@ Open http://localhost:8002. The dot in the top right says `live` when the SSE st
 | `GET /metrics/latest`, `/metrics/history` | Latest `metrics` per insurer; headline totals come from the scorer's `insurer: "all"` row (summed only if it's missing); history for sparklines |
 | `GET /profiles`, `/health` | Harness profiles (Trust Ladder state); health shows change-stream vs polling mode |
 | `POST /appeals/{id}/approve` | Sets `status: "approved"`, `approved_by: "human"`, `approved_at`. 409 if already approved or decided |
+| `POST /appeals/approve-all` | Body `{"insurer": "payer_b" or null, "limit": 20}`: human approval of the oldest drafts (the "Approve drafts" button in the Appeals panel; follows the insurer filter). Draft-only appeals are only decided once approved, and the Trust Ladder earns auto-file from decided appeals |
 | `POST /demo/policy-change` | Calls the simulator's `/admin/policy-change/payer_c`; passes through its 409 when Payer C is already on its latest policy |
 | `POST /demo/reset` | Body `{"confirm": "RESET"}`; runs `scripts/reset_demo.py --yes` (or `--restore $DEMO_RESET_SNAPSHOT`) |
 

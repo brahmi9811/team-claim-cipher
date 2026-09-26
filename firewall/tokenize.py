@@ -101,6 +101,19 @@ def _store_token_mapping(token: str, patient: dict, claim_id: str) -> None:
         log.debug("phi_tokens write skipped (%s)", exc)
 
 
+# Default redaction: structured identifiers only (SSN, phone, dates, member IDs). It
+# deliberately doesn't try to find names; the leak detector's exact-match check against
+# the patient's real values is the backstop, and a hit teaches the insurer's profile a
+# stricter learned guardrail (PLAN.md, "Leak detector (the part that evolves)").
+_LIGHT_REDACT = re.compile(
+    r"\b\d{3}-\d{2}-\d{4}\b"                                   # SSN
+    r"|(?:\+?1[-.\s]?)?\(?\b\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b"  # phone
+    r"|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{4}-\d{2}-\d{2}\b"  # dates
+    r"|\b(?:PAM\d{9}|BXH-\d{8}|PC\d{10})\b"                       # member IDs (sim/README formats)
+    r"|\b\d{9,}\b"
+)
+
+
 def _redact_notes(notes: str | None, learned: set[str]) -> str | None:
     if not notes:
         return None
@@ -108,8 +121,7 @@ def _redact_notes(notes: str | None, learned: set[str]) -> str | None:
         return None
     if "redact_notes_strict" in learned:
         return re.sub(r"\S", "*", notes)
-    # Default per PLAN.md: notes removed unless the profile allows a redacted copy
-    return None
+    return _LIGHT_REDACT.sub("[redacted]", notes)
 
 
 def tokenize(claim: dict, *, profile: dict | None = None) -> dict:

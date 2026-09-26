@@ -210,7 +210,7 @@ The rule is simple: **no real patient identifier ever reaches the LLM**, and the
 | Date of birth | Age band: `40-49` |
 | Service dates | Relative days: `day 0`, `day 12` |
 | Address | State only |
-| Free-text notes | Removed by default; a redacted version only if the insurer profile allows it |
+| Free-text notes | A redacted version (SSNs, phones, dates, member IDs masked); the leak detector blocks the call if anything else, such as a name, gets through, and the insurer then learns `redact_notes_strict` or `drop_notes_field` |
 | Diagnosis and procedure codes, amounts, insurer | Unchanged (needed for billing, not identifying on their own) |
 
 The real values are put back only when the final appeal letter is rendered, in plain code, after all LLM calls are finished.

@@ -199,6 +199,21 @@ def _propose_heuristic(insurer: str, metrics: dict) -> tuple[str, object, str] |
     more confident wrongful calls) -- never lower it.
     """
     profile = profiles.get_profile(insurer)
+
+    # A blocked leak comes first: adopt the guardrail the firewall proposed for it
+    # (PLAN.md: "On a hit ... the Evolver proposes a new guardrail").
+    learned = set(profile["guardrails"].get("learned", []))
+    open_leaks = {g: n for g, n in (metrics.get("phi_blocked_by_guardrail") or {}).items()
+                  if g in ALLOWED_LEARNED_GUARDRAILS and g not in learned}
+    if open_leaks:
+        guardrail = max(open_leaks, key=open_leaks.get)
+        n = open_leaks[guardrail]
+        return (
+            "guardrails.learned",
+            guardrail,
+            f"The leak detector blocked {n} LLM call{'s' if n != 1 else ''} with patient identifiers in the notes; adopting '{guardrail}'.",
+        )
+
     win_rate, appeal_n = metrics["appeal_win_rate"], metrics["appeal_sample_size"]
     if win_rate is None or appeal_n < 3 or win_rate >= 0.5:
         return None

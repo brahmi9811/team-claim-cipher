@@ -28,6 +28,7 @@ from orchestrator.events import emit
 MODEL_ID = llm.MODEL_SONNET
 MIN_CLUSTER_SIZE = 3
 REPROPOSE_AFTER = 5  # new matching denials needed before a rejected rule is proposed again
+BULK_MAX_MEDIAN_LATENCY_MS = 2000
 _KNOWN_LEGIT_CARCS = {"CO-4", "CO-16", "CO-151", "CO-18", "CO-29", "CO-97"}
 # The denial text names the offending line: "Service line 2 (G0444 Depression screening)."
 _SERVICE_LINE_RE = re.compile(r"Service line (\d+) \((\w+)")
@@ -121,6 +122,9 @@ def _classify_with_llm(adjudication: dict, claim: dict, policy_hits: list[dict],
                 "diagnosis_codes": claim["diagnosis_codes"],
                 "lines": claim["lines"],
                 "prior_auth_id": claim.get("prior_auth_id"),
+                # Billing notes as the firewall redacted them; the leak detector checks this
+                # prompt before any call and blocks it if a patient identifier slipped through.
+                "notes": claim.get("notes_redacted"),
             },
             "policy_clauses": [{"id": p["_id"], "clause_no": p.get("clause_no"), "text": p.get("clause_text")} for p in policy_hits],
             "comparable_paid_claims": [c.get("claim_id", c["_id"]) for c in comparable],
@@ -145,9 +149,29 @@ def _classify_heuristic(adjudication: dict, claim: dict, policy_hits: list[dict]
     identical = pattern_stats.get("identical_denials_60s", 0)
     bulk_min = profile["judge"]["bulk_min_identical"]
     comparable_ids = [c.get("claim_id", c["_id"]) for c in comparable]
+    missing_field = {"M62": "prior_auth_id", "N286": "referring_provider_id"}.get(rarc) if carc == "CO-16" else None
+
+    # Bulk = many identical denials in the window AND decided seconds after submission
+    # (PLAN.md, Loop 2: "identical denials in the last 60 seconds, time from submission
+    # to denial"). Checked first: it is the more specific signal. Both the window's median
+    # and this denial must be fast, which keeps slow, ordinary denials of the same code out.
+    fast = BULK_MAX_MEDIAN_LATENCY_MS
+    if (identical >= bulk_min and pattern_stats.get("median_latency_ms", fast) < fast
+            and adjudication.get("latency_ms", fast) < fast):
+        # Both signals agree, so start above the usual 0.75 bar (the old 0.6 start was
+        # tuned for a threshold of 20 and fell under it).
+        confidence = round(min(0.97, 0.8 + 0.02 * (identical - bulk_min)), 2)
+        latency = adjudication.get("latency_ms", 0) / 1000
+        clause = _best_clause(claim, policy_hits)
+        return new_verdict(
+            label=VerdictLabel.WRONGFUL_BULK.value,
+            confidence=confidence,
+            reason=f"{identical} identical '{carc}' denials within the bulk-detection window, this one {latency:.1f} s after submission.",
+            evidence={"clause_ids": [clause["_id"]] if clause else [], "comparable_claim_ids": comparable_ids, "pattern_stats": pattern_stats},
+            model="heuristic-fallback",
+        )
 
     # "Missing" information that is actually on the claim: the insurer's own reason is wrong.
-    missing_field = {"M62": "prior_auth_id", "N286": "referring_provider_id"}.get(rarc) if carc == "CO-16" else None
     if missing_field and claim.get(missing_field):
         clause = _best_clause(claim, policy_hits, prefer_words=("authorization",) if missing_field == "prior_auth_id" else ("referring",))
         return new_verdict(
@@ -155,16 +179,6 @@ def _classify_heuristic(adjudication: dict, claim: dict, policy_hits: list[dict]
             confidence=0.85,
             reason=f"Denied as missing '{missing_field}', but the claim carries one.",
             evidence={"clause_ids": [clause["_id"]] if clause else [], "comparable_claim_ids": comparable_ids, "pattern_stats": pattern_stats},
-            model="heuristic-fallback",
-        )
-
-    if identical >= bulk_min:
-        confidence = round(min(0.97, 0.6 + 0.01 * (identical - bulk_min)), 2)
-        return new_verdict(
-            label=VerdictLabel.WRONGFUL_BULK.value,
-            confidence=confidence,
-            reason=f"{identical} identical '{carc}' denials arrived within the bulk-detection window.",
-            evidence={"clause_ids": [], "comparable_claim_ids": [c.get("claim_id", c["_id"]) for c in comparable], "pattern_stats": pattern_stats},
             model="heuristic-fallback",
         )
     if carc in _KNOWN_LEGIT_CARCS:

@@ -20,10 +20,18 @@ def recent_metrics(insurer: str, window: int = 50) -> dict:
     paid = sum(1 for a in adjudications if a["status"] == "paid")
     overturned = sum(1 for a in appeals if a["outcome"] == "overturned")
 
+    # Leaks the firewall blocked for this insurer, by the guardrail it proposed for each.
+    proposed: dict[str, int] = {}
+    for incident in coll("phi_incidents").find({"insurer": insurer}, {"guardrail_proposed": 1}):
+        g = incident.get("guardrail_proposed")
+        if g:
+            proposed[g] = proposed.get(g, 0) + 1
+
     return {
         "insurer": insurer,
         "sample_size": total,
         "acceptance_rate": (paid / total) if total else None,
         "appeal_sample_size": len(appeals),
         "appeal_win_rate": (overturned / len(appeals)) if appeals else None,
+        "phi_blocked_by_guardrail": proposed,
     }
