@@ -70,7 +70,9 @@ def run_cycle(insurer: str) -> dict | None:
 
     try:
         proposal = _propose_with_llm(insurer, metrics)
-    except (llm.LLMUnavailable, PHILeak):
+    except (llm.LLMUnavailable, KeyError, PHILeak):
+        # KeyError: the LLM returned valid JSON but without "value"/"reason" once
+        # "field" was non-null -- same fallback as a missing key entirely.
         proposal = _propose_heuristic(insurer, metrics)
     if proposal is None:
         return None
@@ -126,7 +128,7 @@ def _check_rollback(insurer: str, metrics: dict) -> dict | None:
     return None
 
 
-def _apply_change(insurer: str, field_path: str, new_value, reason: str, metrics: dict) -> dict:
+def _apply_change(insurer: str, field_path: str, new_value, reason: str, metrics: dict) -> dict | None:
     _validate(field_path, new_value)
 
     if field_path == "judge.min_confidence":
@@ -143,6 +145,9 @@ def _apply_change(insurer: str, field_path: str, new_value, reason: str, metrics
     profile = profiles.get_profile(insurer)
     before = copy.deepcopy(profile)
     is_guardrail = field_path == "guardrails.learned"
+
+    if is_guardrail and new_value in profile["guardrails"].get("learned", []):
+        return None  # already learned; not a real change -- don't bump version or log a false event
 
     _set_field(profile, field_path, new_value)
     profile["version"] += 1

@@ -36,7 +36,9 @@ def draft(verdict: dict, adjudication: dict, tokenized_claim: dict, profile: dic
 
     try:
         letter = _draft_with_llm(verdict, adjudication, tokenized_claim, profile)
-    except (llm.LLMUnavailable, PHILeak):
+    except (llm.LLMUnavailable, KeyError, PHILeak):
+        # KeyError: the LLM returned valid JSON but without a "letter" key --
+        # same fallback as a missing key entirely, not a reason to crash this claim.
         # The heuristic template only ever uses verdict evidence (clause text,
         # comparable ids, pattern stats) and the patient token -- never raw
         # claim/notes fields -- so it's PHI-safe regardless of why the LLM

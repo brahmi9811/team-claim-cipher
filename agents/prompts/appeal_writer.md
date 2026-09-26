@@ -28,7 +28,9 @@ Respond with exactly this JSON shape and nothing else:
 ```
 
 Rules:
-- Reference the patient only as `PATIENT_<token>`, never invent a name.
+- Reference the patient only by the exact `patient_token` value you were given
+  (for example `PATIENT_4821`) -- use it as-is, never invent a name or add
+  another `PATIENT_` prefix to it.
 - Include every clause id, comparable claim id, and pattern statistic given
   to you somewhere in the letter -- omitting evidence you were given weakens
   the appeal for no reason.
