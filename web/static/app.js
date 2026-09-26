@@ -127,6 +127,7 @@
     if (p.outcome === "upheld") return `<span class="pill upheld">Upheld</span>`;
     if (p.status === "approved") return `<span class="pill approved">Approved · filing</span>`;
     if (p.status === "filed") return `<span class="pill pending">Filed</span>`;
+    if (p.status === "filing_failed") return `<span class="pill upheld" title="${esc(p.filing_error || "")}">Filing failed · retry</span>`;
     return p.mode === "auto_file" ? `<span class="pill pending">Filing</span>` : `<span class="pill draft">Draft · needs approval</span>`;
   }
   function needsApproval(p) { return !p.outcome && p.mode !== "auto_file" && !["approved", "filed"].includes(p.status); }

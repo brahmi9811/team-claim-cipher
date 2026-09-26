@@ -76,7 +76,7 @@ def _patient_values_for_claim(claim_id: str | None) -> list[str]:
 def _values_from_token_mentions(text: str) -> list[str]:
     """If the text already contains PATIENT_NNNN, pull those refs for exact match."""
     values: list[str] = []
-    for token in re.findall(r"PATIENT_\d{4}", text):
+    for token in re.findall(r"PATIENT_(?:\d{8}|\d{4})\b", text):
         ref = lookup_patient(token)
         if not ref:
             continue

@@ -55,7 +55,8 @@ WATCHED = {
 }
 # Fields a claim may expose to the browser. Everything else (patient.*, notes, records) stays in the database.
 CLAIM_SAFE_FIELDS = ["insurer", "encounter_type", "diagnosis_codes", "lines", "total_charge_usd", "prior_auth_id", "referring_provider_id", "holdout"]
-SORT_FIELD = {dbm.ADJUDICATIONS: "adjudicated_at", dbm.HARNESS_EVENTS: "ts", dbm.APPEALS: "_id", dbm.HARNESS_PROFILES: "_id"}
+# Appeal ids are random (new_id), so appeals sort by created_at to list the newest first.
+SORT_FIELD = {dbm.ADJUDICATIONS: "adjudicated_at", dbm.HARNESS_EVENTS: "ts", dbm.APPEALS: "created_at", dbm.HARNESS_PROFILES: "_id"}
 
 
 # --- JSON ------------------------------------------------------------------
@@ -320,7 +321,7 @@ def adjudication_detail(adj_id: str, request: Request):
     claims = safe_claims(db, [adj["claim_id"], *(c["claim_id"] for c in comparables)])
     for c in comparables:
         c["claim"] = claims.get(c["claim_id"])
-    appeal = db[dbm.APPEALS].find_one({"claim_id": adj["claim_id"]}, sort=[("_id", -1)])
+    appeal = db[dbm.APPEALS].find_one({"claim_id": adj["claim_id"]}, sort=[("created_at", -1)])
     attempts = list(db[dbm.ADJUDICATIONS].find({"claim_id": adj["claim_id"]}, {"attempt": 1, "status": 1, "carc": 1, "adjudicated_at": 1}).sort("attempt", 1))
     return clean({"adjudication": adj, "claim": claims.get(adj["claim_id"]), "clauses": clauses, "comparables": comparables, "appeal": appeal, "attempts": attempts})
 

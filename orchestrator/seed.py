@@ -50,7 +50,7 @@ def build_claim(
         "patient": _fake_patient(rng),
         "service_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
         "encounter_type": "outpatient",
-        "diagnosis_codes": diagnosis_codes or ["R51.9"],
+        "diagnosis_codes": diagnosis_codes or ["J06.9"],
         "lines": lines,
         "total_charge_usd": total,
         "prior_auth_id": prior_auth_id,
@@ -78,7 +78,7 @@ def missing_prior_auth_claim(insurer: str, rng: random.Random) -> dict:
 
 
 def clean_paid_claim(insurer: str, rng: random.Random) -> dict:
-    lines = [{"line_no": 1, "hcpcs": "99213", "modifiers": [], "units": 1, "charge_usd": 120.0}]
+    lines = [{"line_no": 1, "hcpcs": "G0463", "modifiers": [], "units": 1, "charge_usd": 140.0}]
     claim = build_claim(insurer, lines, rng=rng)
     claim["prior_auth_id"] = claim["records"]["prior_auth_id"]
     return claim
@@ -86,16 +86,17 @@ def clean_paid_claim(insurer: str, rng: random.Random) -> dict:
 
 def wrongful_bulk_imaging_claim(rng: random.Random) -> dict:
     """Payer B, high-cost imaging: triggers the wrongful_bulk fallback."""
-    lines = [{"line_no": 1, "hcpcs": "70551", "modifiers": [], "units": 1, "charge_usd": 2400.0}]
+    lines = [{"line_no": 1, "hcpcs": "C8908", "modifiers": [], "units": 1, "charge_usd": 2450.0}]
     claim = build_claim("payer_b", lines, rng=rng)
     claim["prior_auth_id"] = claim["records"]["prior_auth_id"]
     return claim
 
 
 def wrongful_policy_claim(rng: random.Random) -> dict:
-    """Payer A, chemo administration: triggers the wrongful_policy fallback."""
-    lines = [{"line_no": 1, "hcpcs": "J9999", "modifiers": [], "units": 1, "charge_usd": 800.0}]
-    claim = build_claim("payer_a", lines, rng=rng, diagnosis_codes=["C50.911"])
+    """Payer A, clinic visit for a chronic condition: triggers the wrongful_policy fallback
+    (the same pattern as the real simulator's a_wrong_01)."""
+    lines = [{"line_no": 1, "hcpcs": "G0463", "modifiers": [], "units": 1, "charge_usd": 140.0}]
+    claim = build_claim("payer_a", lines, rng=rng, diagnosis_codes=["I10"])
     claim["prior_auth_id"] = claim["records"]["prior_auth_id"]
     return claim
 
@@ -124,13 +125,13 @@ def seed_policies() -> None:
             continue
         coll("policies").insert_one({
             "_id": f"{insurer}_v1_c7", "insurer": insurer, "version": 1, "clause_no": 7,
-            "title": "Chemotherapy administration",
-            "clause_text": "Clause 7: chemotherapy administration billed as J9999 is covered when accompanied by a supporting oncology diagnosis.",
+            "title": "Chronic condition clinic visits",
+            "clause_text": "Clause 7: hospital outpatient clinic visits billed as G0463 are covered when the diagnosis is a chronic condition such as I10 hypertension.",
             "current": True,
         })
         coll("policies").insert_one({
             "_id": f"{insurer}_v1_c12", "insurer": insurer, "version": 1, "clause_no": 12,
             "title": "Diagnostic imaging",
-            "clause_text": "Clause 12: diagnostic imaging such as 70551 is covered once per encounter with an appropriate diagnosis.",
+            "clause_text": "Clause 12: advanced diagnostic imaging such as C8908 is covered once per encounter with an appropriate diagnosis.",
             "current": True,
         })

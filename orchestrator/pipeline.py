@@ -49,8 +49,9 @@ def process_claim(claim: dict) -> dict:
         summary["status"] = "held_for_review"
         return summary
 
+    submitted_at = utcnow()
     response = sim_client.submit(scrub_result["claim"])
-    adjudication = _record_adjudication(claim, response)
+    adjudication = _record_adjudication(claim, response, submitted_at)
     summary["status"] = adjudication["status"]
 
     for rule_id in scrub_result["applied_rule_ids"]:
@@ -78,7 +79,7 @@ def process_claim(claim: dict) -> dict:
     return summary
 
 
-def _record_adjudication(claim: dict, response: dict) -> dict:
+def _record_adjudication(claim: dict, response: dict, submitted_at) -> dict:
     adjudication = {
         "_id": response["adjudication_id"],  # A's real key; the fallback sim sets it the same way
         "claim_id": response["claim_id"],
@@ -89,7 +90,7 @@ def _record_adjudication(claim: dict, response: dict) -> dict:
         "rarc": response.get("rarc"),
         "denial_text": response.get("denial_text"),
         "paid_amount_usd": response.get("paid_amount", 0.0),
-        "submitted_at": as_datetime(response.get("submitted_at") or utcnow()),
+        "submitted_at": as_datetime(response.get("submitted_at") or submitted_at),
         "adjudicated_at": as_datetime(response["adjudicated_at"]),
         "latency_ms": response.get("latency_ms", 0),
         "verdict": None,

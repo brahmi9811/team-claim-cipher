@@ -63,17 +63,26 @@ def _claims_collection(allow_plaintext: bool):
 
 
 def load_policies() -> dict:
-    """Publish version 1 of every insurer's policy as current. Safe to run twice."""
+    """Publish every version of every insurer's policy. Safe to run twice.
+
+    Later versions (Payer C v2) are stored as not current up front, so
+    scripts/embed_policies.py embeds them before the policy-change button is
+    pressed. The version that is already current stays current (v1 on a first
+    load), so re-running this mid-demo doesn't undo a policy change.
+    """
     from common.db import get_db
 
     coll = get_db("forge")["policies"]
     counts = {}
     for insurer in INSURERS:
-        docs = pol.policy_docs(insurer, 1, current=True)
-        for doc in docs:
-            coll.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)  # $set keeps a stored `embedding`
-        coll.update_many({"insurer": insurer, "version": {"$ne": 1}}, {"$set": {"current": False}})
-        counts[insurer] = len(docs)
+        live = coll.find_one({"insurer": insurer, "current": True}, {"version": 1}, sort=[("version", -1)])
+        current_version = int(live["version"]) if live else 1
+        n = 0
+        for version in pol.versions(insurer):
+            for doc in pol.policy_docs(insurer, version, current=version == current_version):
+                coll.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)  # $set keeps a stored `embedding`
+                n += 1
+        counts[insurer] = n
     return counts
 
 

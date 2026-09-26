@@ -27,6 +27,7 @@ from orchestrator.events import emit
 
 MODEL_ID = llm.MODEL_SONNET
 MIN_CLUSTER_SIZE = 3
+REPROPOSE_AFTER = 5  # new matching denials needed before a rejected rule is proposed again
 _KNOWN_LEGIT_CARCS = {"CO-4", "CO-16", "CO-151", "CO-18", "CO-29", "CO-97"}
 # The denial text names the offending line: "Service line 2 (G0444 Depression screening)."
 _SERVICE_LINE_RE = re.compile(r"Service line (\d+) \((\w+)")
@@ -229,9 +230,12 @@ def _propose_rule_if_clustered(adjudication: dict, claim: dict) -> dict | None:
         return None
     condition, fix = suggestion
 
-    live_rules = [r for r in coll("rules").find({"insurer": insurer}) if r["status"] != RuleStatus.REJECTED.value]
-    if any(r["condition"] == condition and r["fix"] == fix for r in live_rules):
+    same = [r for r in coll("rules").find({"insurer": insurer}) if r["condition"] == condition and r["fix"] == fix]
+    if any(r["status"] != RuleStatus.REJECTED.value for r in same):
         return None  # already proposed (or promoted); don't spam duplicates
+    rejected_at = max((len(r.get("evidence_ids") or []) for r in same), default=None)
+    if rejected_at is not None and cluster_size < rejected_at + REPROPOSE_AFTER:
+        return None  # replay rejected this rule; wait for new evidence instead of re-proposing every denial
 
     evidence_ids = [a["_id"] for a in cluster] + [adjudication["_id"]]
     rule = new_rule(insurer=insurer, condition=condition, fix=fix, evidence_ids=evidence_ids, created_by="judge")

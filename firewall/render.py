@@ -11,7 +11,7 @@ from firewall.tokenize import lookup_patient
 
 log = logging.getLogger(__name__)
 
-_TOKEN_RE = re.compile(r"PATIENT_\d{4}")
+_TOKEN_RE = re.compile(r"PATIENT_(?:\d{8}|\d{4})\b")  # 4-digit tokens predate the 8-digit format
 
 
 def render_letter(

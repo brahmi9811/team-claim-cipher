@@ -16,6 +16,7 @@ from __future__ import annotations
 import logging
 
 from agents import appeal_writer, trust_ladder
+from orchestrator.contracts.sim_client import SimulatorError
 from orchestrator.db import coll
 
 log = logging.getLogger(__name__)
@@ -30,6 +31,11 @@ def file_approved_appeals() -> list[dict]:
             result = appeal_writer.file(appeal)
             trust_ladder.update(appeal["insurer"])
             filed.append(result)
+        except SimulatorError as exc:
+            # The simulator refused it (e.g. 404: no denial on record). Retrying every poll would
+            # loop forever; the live view shows Approve again so a human can retry.
+            log.warning("simulator refused approved appeal %s: %s", appeal.get("_id"), exc)
+            coll("appeals").update_one({"_id": appeal["_id"]}, {"$set": {"status": "filing_failed", "filing_error": str(exc)}})
         except Exception:  # noqa: BLE001 -- one bad appeal must not block the others
             log.exception("failed to file approved appeal %s", appeal.get("_id"))
     return filed

@@ -76,7 +76,9 @@ The agents never see the hidden rules or the ground truth. They learn only from 
     python scripts/setup_db.py      # collections, indexes, time-series metrics, roles
     python -m forge all             # 2,000 claims (encrypted), policies, PHI canaries
     python -m forge extend --rounds 4 && python -m forge load   # more claims for a long run
+    python scripts/embed_policies.py   # needs ".[embeddings]"; clause embeddings for Vector Search (incl. Payer C v2)
     ```
+    `setup_db.py` creates the Vector Search index; `embed_policies.py` fills it. Without embeddings the Judge falls back to keyword search and code matching.
 4. Run the system, one terminal each:
     ```
     python -m sim                   # insurer simulator, http://localhost:8001

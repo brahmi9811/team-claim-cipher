@@ -63,12 +63,18 @@ class Simulator:
         self.clock = clock
         # FastAPI runs these handlers in a thread pool; attempt numbers and appeal
         # payouts are read-then-write, so concurrent calls for one claim must not interleave.
-        self._lock = threading.RLock()
+        # One lock per claim: a single global lock would queue every submit behind Atlas writes.
+        self._lock = threading.RLock()  # policy version changes
+        self._claim_locks: dict[str, threading.Lock] = {}
+
+    def _claim_lock(self, claim_id: object) -> threading.Lock:
+        with self._lock:
+            return self._claim_locks.setdefault(str(claim_id), threading.Lock())
 
     # --- POST /submit -------------------------------------------------------
 
     def submit(self, claim: dict) -> dict:
-        with self._lock:
+        with self._claim_lock(_claim_id(claim) if isinstance(claim, dict) else None):
             return self._submit(claim)
 
     def _submit(self, claim: dict) -> dict:
@@ -87,9 +93,10 @@ class Simulator:
         batch_id = None
         if bulk:
             # Payer B holds matching claims and denies them together: every denial in the
-            # same 2-second window shares one timestamp and batch id.
+            # same 2-second window shares one timestamp (the window's end, so it never
+            # precedes the submission) and one batch id.
             epoch = int(now.timestamp()) // BATCH_SECONDS * BATCH_SECONDS
-            now = datetime.fromtimestamp(epoch, tz=timezone.utc)
+            now = datetime.fromtimestamp(epoch + BATCH_SECONDS, tz=timezone.utc)
             batch_id = f"batch_{insurer}_{epoch}"
 
         total = round(float(claim.get("total_charge_usd") or 0.0), 2)
@@ -164,7 +171,7 @@ class Simulator:
     # --- POST /appeal -------------------------------------------------------
 
     def appeal(self, request: dict) -> dict:
-        with self._lock:
+        with self._claim_lock(request.get("claim_id") if isinstance(request, dict) else None):
             return self._appeal(request)
 
     def _appeal(self, request: dict) -> dict:

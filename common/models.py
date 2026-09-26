@@ -6,6 +6,7 @@ these Pydantic models are the single source of truth for the *shape*.
 """
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import datetime, timezone
 from enum import Enum
@@ -256,7 +257,7 @@ class Appeal(BaseModel):
     evidence: dict[str, Any] = Field(default_factory=dict)
     letter_tokenized: str
     mode: Literal["draft_only", "auto_file"]
-    status: Literal["drafted", "pending_approval", "approved", "filed"] = "drafted"
+    status: Literal["drafted", "pending_approval", "approved", "filed", "filing_failed"] = "drafted"
     outcome: Optional[Literal["overturned", "upheld"]] = None
     recovered_usd: float = 0.0
     filed_at: Optional[str] = None
@@ -346,6 +347,13 @@ class PhiIncident(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _default_appeal_mode() -> str:
+    """DEFAULT_APPEAL_MODE=auto_file lets a demo file appeals without approval clicks.
+    Anything else (or unset) keeps the safe default: a human approves every appeal."""
+    mode = os.environ.get("DEFAULT_APPEAL_MODE", "").strip()
+    return mode if mode in {m.value for m in AppealMode} else AppealMode.DRAFT_ONLY.value
+
+
 def default_harness_profile(insurer: str) -> dict[str, Any]:
     return {
         "_id": insurer,
@@ -366,7 +374,7 @@ def default_harness_profile(insurer: str) -> dict[str, Any]:
             "include_pattern_stats": True,
         },
         "permissions": {
-            "appeals": AppealMode.DRAFT_ONLY.value,
+            "appeals": _default_appeal_mode(),
             "earned_at": None,
         },
         "guardrails": {

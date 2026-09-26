@@ -1,6 +1,6 @@
 """Tokenize claims before any LLM call.
 
-Real patient fields become ``PATIENT_NNNN``, age bands, state-only address,
+Real patient fields become ``PATIENT_NNNNNNNN``, age bands, state-only address,
 and relative service days. Mapping is stored in ``phi_tokens`` (encrypted).
 """
 from __future__ import annotations
@@ -39,8 +39,10 @@ def _extract_state(address: str) -> str:
 
 
 def _stable_token(member_id: str) -> str:
+    # 8 digits: with 4, a few hundred patients already shared tokens, and render_letter
+    # would put one patient's name into another patient's appeal.
     digest = hashlib.sha256(member_id.encode()).hexdigest()
-    return f"PATIENT_{int(digest[:8], 16) % 10_000:04d}"
+    return f"PATIENT_{int(digest[:12], 16) % 100_000_000:08d}"
 
 
 def _service_day(claim: dict) -> int:

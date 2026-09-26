@@ -101,6 +101,7 @@ def ensure_indexes(client: MongoClient) -> None:
     db[dbmod.APPEALS].create_index(
         [("insurer", ASCENDING), ("outcome", ASCENDING)], name="appeals_insurer_outcome"
     )
+    db[dbmod.APPEALS].create_index([("created_at", DESCENDING)], name="appeals_created_at")
     db[dbmod.POLICIES].create_index(
         [("insurer", ASCENDING), ("version", ASCENDING), ("current", ASCENDING)],
         name="policies_insurer_version",

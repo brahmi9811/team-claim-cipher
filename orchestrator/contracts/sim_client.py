@@ -28,22 +28,35 @@ from orchestrator.db import coll, utcnow
 log = logging.getLogger(__name__)
 
 SIM_URL = os.environ.get("SIM_URL", "http://localhost:8001")
-_TIMEOUT_SEC = 1.5
+# Generous: a timeout counts as "unreachable" and triggers the fallback, which has no ground
+# truth -- a busy simulator writing to Atlas must not be mistaken for a missing one.
+_TIMEOUT_SEC = float(os.environ.get("SIM_TIMEOUT_SEC", "10"))
 
 _REQUIRES_PRIOR_AUTH = {"G0439"}
 _MAX_UNITS_PER_DAY = 4
+_ADVANCED_IMAGING = {"C8901", "C8908"}
+_CHRONIC_DX = {"N18.4", "E11.9", "I10", "E78.5"}
+
+
+class SimulatorError(RuntimeError):
+    """The simulator answered, but with an error (4xx/5xx). Never replaced by the fallback:
+    a made-up result would have no ground truth in sim_truth and skew the scoreboard."""
 
 
 def _post(path: str, payload: dict) -> dict | None:
+    """Returns the simulator's JSON, or None only when the simulator can't be reached."""
+    req = urllib.request.Request(
+        f"{SIM_URL}{path}",
+        data=json.dumps(payload, default=str).encode(),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
     try:
-        req = urllib.request.Request(
-            f"{SIM_URL}{path}",
-            data=json.dumps(payload, default=str).encode(),
-            headers={"Content-Type": "application/json"},
-            method="POST",
-        )
         with urllib.request.urlopen(req, timeout=_TIMEOUT_SEC) as resp:
             return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:  # subclass of URLError: must come first
+        detail = exc.read().decode(errors="replace")[:300]
+        raise SimulatorError(f"POST {path} -> {exc.code}: {detail}") from exc
     except (urllib.error.URLError, TimeoutError, ConnectionError, OSError):
         return None
 
@@ -122,13 +135,14 @@ def _fallback_denial_reason(claim: dict) -> tuple[str, str, str, str, str, int] 
         if line.get("units", 1) > _MAX_UNITS_PER_DAY:
             return ("CO-151", "N362", f"Units exceed the daily maximum. Service line {line['line_no']} ({line['hcpcs']}).",
                     "legit", "fallback_legit_units", random.randint(300, 900))
-    imaging_lines = [ln for ln in claim.get("lines", []) if ln["hcpcs"].startswith("7")]
+    imaging_lines = [ln for ln in claim.get("lines", []) if ln["hcpcs"] in _ADVANCED_IMAGING]
     if claim["insurer"] == "payer_b" and imaging_lines and claim["total_charge_usd"] > 2000:
         return ("CO-50", "N115", "Not medically necessary",
                 "wrongful", "fallback_wrongful_bulk_imaging", random.randint(800, 1500))
-    if claim["insurer"] == "payer_a" and any(ln["hcpcs"] == "J9999" for ln in claim.get("lines", [])):
-        return ("CO-50", "N115", "Not medically necessary",
-                "wrongful", "fallback_wrongful_policy_j9999", random.randint(400, 1000))
+    chronic = set(claim.get("diagnosis_codes") or []) & _CHRONIC_DX
+    if claim["insurer"] == "payer_a" and chronic and any(ln["hcpcs"] == "G0463" for ln in claim.get("lines", [])):
+        return ("CO-50", "N130", "Not medically necessary",
+                "wrongful", "fallback_wrongful_policy_chronic_visit", random.randint(400, 1000))
     return None
 
 
